@@ -68,6 +68,7 @@ make format
 
 ```text
 .
+├── .dockerignore
 ├── Dockerfile
 ├── docker-compose.yml
 ├── Makefile
