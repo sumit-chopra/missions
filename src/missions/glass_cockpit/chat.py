@@ -30,12 +30,12 @@ def chat() -> int:
             return 0
 
         try:
-            reply = client.send(user_input)
+            for chunk in client.send(user_input):
+                print(chunk, end="", flush=True)
+            print()
         except LLMRequestError as exc:
-            print(f"error: {exc}")
+            print(f"\nerror: {exc}")
             continue
-
-        print(reply)
 
 
 if __name__ == "__main__":

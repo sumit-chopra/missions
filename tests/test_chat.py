@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from conftest import make_response
+from conftest import make_stream
 from openai import OpenAIError
 
 from missions.glass_cockpit.chat import chat
@@ -25,8 +25,11 @@ def test_chat_exit_keywords(
 def test_chat_sends_messages_to_llm_then_exits(
     openai_create: MagicMock, capsys: pytest.CaptureFixture[str]
 ):
-    """Each non-exit line is forwarded to the LLM and the reply is printed."""
-    openai_create.side_effect = [make_response("hi there"), make_response("doing well")]
+    """Each non-exit line is forwarded to the LLM and the streamed reply is printed."""
+    openai_create.side_effect = [
+        make_stream("hi", " ", "there"),
+        make_stream("doing", " ", "well"),
+    ]
     with patch("builtins.input", side_effect=["hello world", "how are you?", "exit"]):
         result = chat()
 
