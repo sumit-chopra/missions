@@ -4,16 +4,17 @@ A minimal terminal-based conversational LLM client.
 
 ## Current Status
 
-The project currently contains a basic terminal chat loop with no LLM wired
-up yet — it just echoes back what you type. It:
+The project is a terminal chat loop backed by an OpenAI model. It:
 
-- Accepts user input from the terminal
+- Accepts user input from the terminal and sends it to the configured model
+- Each message is a one-shot prompt (no conversation history)
 - Exits on `exit`, `quit`, `bye`, `Ctrl+C`, or `Ctrl+D`
 
 ## Requirements
 
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/)
+- An OpenAI API key
 - Docker + Docker Compose (optional, only needed to run in a container)
 
 ## Setup
@@ -22,6 +23,22 @@ up yet — it just echoes back what you type. It:
 make setup
 # or: uv sync
 ```
+
+## Configuration
+
+Copy `.env.example` to `.env` and fill in your key:
+
+```bash
+cp .env.example .env
+```
+
+| Variable          | Required | Default       | Purpose                                  |
+| ----------------- | -------- | ------------- | ---------------------------------------- |
+| `OPENAI_API_KEY`  | yes      | —             | Your OpenAI API key                      |
+| `MODEL_NAME`      | no       | `gpt-4o-mini` | Chat model to use                        |
+| `OPENAI_BASE_URL` | no       | OpenAI's API  | Override for a proxy / compatible gateway |
+
+`.env` is gitignored and loaded automatically at startup.
 
 ## Running the app
 
@@ -48,7 +65,8 @@ make test
 # or: uv run pytest -q
 ```
 
-Tests are located under `tests/` (e.g., `test_chat.py` testing terminal chat loop behavior).
+Tests live under `tests/`: `test_chat.py` covers the terminal loop (with a fake
+client, so no network calls) and `test_llm_client.py` covers the OpenAI wrapper.
 
 ## Linting
 
@@ -69,6 +87,7 @@ make format
 ```text
 .
 ├── .dockerignore
+├── .env.example
 ├── Dockerfile
 ├── docker-compose.yml
 ├── Makefile
@@ -79,7 +98,10 @@ make format
 │       ├── __init__.py
 │       └── glass_cockpit/
 │           ├── __init__.py
-│           └── chat.py
+│           ├── chat.py
+│           └── llm_client.py
 └── tests/
-    └── test_chat.py
+    ├── conftest.py
+    ├── test_chat.py
+    └── test_llm_client.py
 ```
