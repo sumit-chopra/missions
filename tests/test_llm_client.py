@@ -2,12 +2,13 @@
 
 Everything is mocked at the edge (see conftest): the ``openai`` SDK's ``OpenAI``
 class is patched, and ``OpenAI().chat.completions.create`` returns a canned
-response.
+stream of chunks.
 """
 
 from unittest.mock import MagicMock, patch
 
 import pytest
+from conftest import make_stream
 from openai import OpenAIError
 
 from missions.glass_cockpit.llm_client import (
@@ -18,18 +19,27 @@ from missions.glass_cockpit.llm_client import (
 )
 
 
-def test_send_returns_reply_text(openai_create: MagicMock):
-    assert LLMClient().send("hi") == "pong"
+def test_send_streams_reply_text(openai_create: MagicMock):
+    openai_create.return_value = make_stream("po", "ng")
+    assert "".join(LLMClient().send("hi")) == "pong"
 
 
-def test_send_passes_model_and_messages(openai_create: MagicMock, monkeypatch: pytest.MonkeyPatch):
+def test_send_skips_chunks_without_content(openai_create: MagicMock):
+    openai_create.return_value = make_stream("hi", None, " there")
+    assert "".join(LLMClient().send("hi")) == "hi there"
+
+
+def test_send_passes_model_messages_and_stream_flag(
+    openai_create: MagicMock, monkeypatch: pytest.MonkeyPatch
+):
     monkeypatch.setenv("MODEL_NAME", "gpt-test")
 
-    LLMClient().send("hi there")
+    list(LLMClient().send("hi there"))
 
     openai_create.assert_called_once()
     kwargs = openai_create.call_args.kwargs
     assert kwargs["model"] == "gpt-test"
+    assert kwargs["stream"] is True
     assert kwargs["messages"] == [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": "hi there"},
@@ -38,8 +48,8 @@ def test_send_passes_model_and_messages(openai_create: MagicMock, monkeypatch: p
 
 def test_each_send_is_independent(openai_create: MagicMock):
     client = LLMClient()
-    client.send("first message")
-    client.send("second message")
+    list(client.send("first message"))
+    list(client.send("second message"))
 
     # No history carried between calls: system + the current user turn only.
     messages = openai_create.call_args_list[1].kwargs["messages"]
@@ -61,4 +71,4 @@ def test_init_raises_initialisation_error_on_construction_failure():
 def test_send_raises_request_error_on_api_failure(openai_create: MagicMock):
     openai_create.side_effect = OpenAIError("rate limited")
     with pytest.raises(LLMRequestError, match="request failed"):
-        LLMClient().send("hi")
+        list(LLMClient().send("hi"))

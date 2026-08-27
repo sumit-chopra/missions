@@ -4,6 +4,7 @@ Each call is independent — no conversation history is kept.
 """
 
 import os
+from collections.abc import Iterator
 
 from openai import OpenAI, OpenAIError
 
@@ -46,22 +47,25 @@ class LLMClient:
         except OpenAIError as exc:
             raise LLMInitialisationError(f"could not initialise OpenAI client: {exc}") from exc
 
-    def send(self, message: str) -> str:
-        """Send ``message`` as a one-shot prompt and return the assistant reply.
+    def send(self, message: str) -> Iterator[str]:
+        """Send ``message`` as a one-shot prompt, yielding reply text as it streams in.
 
-        Raises :class:`LLMRequestError` if the request fails.
+        Raises :class:`LLMRequestError` if the request fails — which, because the
+        response is streamed, may happen after some text has already been yielded.
         """
         try:
-            response = self._client.chat.completions.create(
+            stream = self._client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": message},
                 ],
                 max_completion_tokens=MAX_COMPLETION_TOKENS,
+                stream=True,
             )
+            for chunk in stream:
+                content = chunk.choices[0].delta.content
+                if content:
+                    yield content
         except OpenAIError as exc:
             raise LLMRequestError(f"request failed: {exc}") from exc
-
-        reply = response.choices[0].message.content or ""
-        return reply
