@@ -13,7 +13,7 @@ run:
 	uv run python src/missions/glass_cockpit/chat.py
 
 docker:
-	docker compose run --rm chat
+	docker compose run --build --rm chat
 
 lint:
 	uv run ruff check .
