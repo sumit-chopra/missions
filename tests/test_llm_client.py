@@ -40,6 +40,7 @@ def test_send_passes_model_messages_and_stream_flag(
     kwargs = openai_create.call_args.kwargs
     assert kwargs["model"] == "gpt-test"
     assert kwargs["stream"] is True
+    assert kwargs["stream_options"] == {"include_usage": True}
     assert kwargs["messages"] == [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": "hi there"},
@@ -72,3 +73,29 @@ def test_send_raises_request_error_on_api_failure(openai_create: MagicMock):
     openai_create.side_effect = OpenAIError("rate limited")
     with pytest.raises(LLMRequestError, match="request failed"):
         list(LLMClient().send("hi"))
+
+
+def test_send_records_metrics_from_usage_chunk(
+    openai_create: MagicMock, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("MODEL_NAME", "gpt-4o-mini")
+    openai_create.return_value = make_stream("hi", prompt_tokens=12, completion_tokens=8)
+
+    client = LLMClient()
+    list(client.send("hello"))
+
+    assert client.last_metrics is not None
+    assert client.last_metrics.model_name == "gpt-4o-mini"
+    assert client.last_metrics.prompt_tokens == 12
+    assert client.last_metrics.completion_tokens == 8
+    assert client.last_metrics.latency_ms >= 0
+
+
+def test_send_leaves_metrics_unset_on_failure(openai_create: MagicMock):
+    openai_create.side_effect = OpenAIError("boom")
+
+    client = LLMClient()
+    with pytest.raises(LLMRequestError):
+        list(client.send("hi"))
+
+    assert client.last_metrics is None

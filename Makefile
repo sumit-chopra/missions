@@ -10,7 +10,7 @@ test:
 	uv run pytest -q
 
 run:
-	uv run python src/missions/glass_cockpit/chat.py
+	uv run --quiet python src/missions/glass_cockpit/chat.py
 
 docker:
 	docker compose run --build --rm chat
