@@ -24,6 +24,13 @@ def make_stream(
     return [*text, usage_chunk]
 
 
+@pytest.fixture(autouse=True)
+def isolated_history_db(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point the conversation store at a throwaway file per test, so a bare
+    ``ConversationStore()`` in any test is isolated."""
+    monkeypatch.setenv("GLASS_COCKPIT_HISTORY_DB", str(tmp_path / "history.db"))
+
+
 @pytest.fixture
 def openai_create() -> Iterator[MagicMock]:
     """Patch ``OpenAI`` in llm_client; yield the mock ``chat.completions.create``.

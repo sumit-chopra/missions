@@ -5,6 +5,7 @@ import sys
 from dotenv import load_dotenv
 
 from missions.glass_cockpit.llm_client import LLMClient, LLMInitialisationError, LLMRequestError
+from missions.glass_cockpit.store import ConversationStore
 from missions.glass_cockpit.telemetry import LLMMetrics
 
 EXIT_KEYWORDS = ["exit", "quit", "bye"]
@@ -24,7 +25,7 @@ def chat() -> int:
     print("Glass Cockpit — type a message. Ctrl+C or 'exit' to quit.")
 
     try:
-        client = LLMClient()
+        client = LLMClient(store=ConversationStore())
     except LLMInitialisationError as exc:
         print(f"Could not initialise the LLM client: {exc}")
         return 1

@@ -1,6 +1,7 @@
 """Thin wrapper around the OpenAI chat completions API.
 
-Each call is independent — no conversation history is kept.
+Every call replays the recent turns held by a :class:`ConversationStore` as
+context, and records each successful exchange back to it.
 """
 
 import os
@@ -10,6 +11,7 @@ from collections.abc import Iterator
 from openai import OpenAI, OpenAIError
 from openai.types import CompletionUsage
 
+from missions.glass_cockpit.store import ConversationStore
 from missions.glass_cockpit.telemetry import LLMMetrics
 
 DEFAULT_MODEL = "gpt-4o-mini"
@@ -37,38 +39,51 @@ class LLMRequestError(LLMError):
 
 
 class LLMClient:
-    """Stateless OpenAI chat client.
+    """OpenAI chat client with short-term memory.
 
     Credentials come from the environment (``OPENAI_API_KEY``, optionally
     ``OPENAI_BASE_URL``). The model comes from ``MODEL_NAME``, falling back to
     :data:`DEFAULT_MODEL`.
+
+    The turns held by ``store`` are prepended to every request, and each
+    successful exchange is appended to it.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, store: ConversationStore) -> None:
         self.model = os.environ.get("MODEL_NAME") or DEFAULT_MODEL
         self.last_metrics: LLMMetrics | None = None
+        self.store = store
         try:
             self._client = OpenAI()
         except OpenAIError as exc:
             raise LLMInitialisationError(f"could not initialise OpenAI client: {exc}") from exc
 
+    def _build_messages(self, message: str) -> list[dict[str, str]]:
+        """System prompt, then any recorded turns, then the current user message."""
+        messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        for turn in self.store.recent_turns():
+            messages.append({"role": "user", "content": turn.user_message})
+            messages.append({"role": "assistant", "content": turn.assistant_message})
+        messages.append({"role": "user", "content": message})
+        return messages
+
     def send(self, message: str) -> Iterator[str]:
         """Send ``message`` as a one-shot prompt, yielding reply text as it streams in.
 
         On success, :attr:`last_metrics` is set to the :class:`LLMMetrics` for the
-        call. Raises :class:`LLMRequestError` if the request fails — which, because
-        the response is streamed, may happen after some text has already been yielded.
+        call and the exchange is recorded to the store. Raises
+        :class:`LLMRequestError` if the request fails — which, because the response
+        is streamed, may happen after some text has already been yielded; a failed
+        call records nothing.
         """
         self.last_metrics = None
         start = time.perf_counter()
         usage = None
+        reply: list[str] = []
         try:
             stream = self._client.chat.completions.create(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": message},
-                ],
+                messages=self._build_messages(message),
                 max_completion_tokens=MAX_COMPLETION_TOKENS,
                 stream=True,
                 stream_options={"include_usage": True},
@@ -77,9 +92,12 @@ class LLMClient:
                 if chunk.usage is not None:
                     usage = chunk.usage
                 if chunk.choices and (content := chunk.choices[0].delta.content):
+                    reply.append(content)
                     yield content
         except OpenAIError as exc:
             raise LLMRequestError(f"request failed: {exc}") from exc
+
+        self.store.add_turn(message, "".join(reply))
 
         if usage:
             self.last_metrics = self.construct_metrics(usage, start, time.perf_counter())

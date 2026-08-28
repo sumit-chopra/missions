@@ -7,7 +7,7 @@ A minimal terminal-based conversational LLM client.
 The project is a terminal chat loop backed by an OpenAI model. It:
 
 - Accepts user input from the terminal and sends it to the configured model
-- Each message is a one-shot prompt (no conversation history)
+- Replays the last 10 turns as context, persisted in a local SQLite file
 - Exits on `exit`, `quit`, `bye`, `Ctrl+C`, or `Ctrl+D`
 
 ## Requirements
@@ -32,11 +32,12 @@ Copy `.env.example` to `.env` and fill in your key:
 cp .env.example .env
 ```
 
-| Variable          | Required | Default       | Purpose                                  |
-| ----------------- | -------- | ------------- | ---------------------------------------- |
-| `OPENAI_API_KEY`  | yes      | —             | Your OpenAI API key                      |
-| `MODEL_NAME`      | no       | `gpt-4o-mini` | Chat model to use                        |
-| `OPENAI_BASE_URL` | no       | OpenAI's API  | Override for a proxy / compatible gateway |
+| Variable                   | Required | Default                      | Purpose                                   |
+| -------------------------- | -------- | ---------------------------- | ----------------------------------------- |
+| `OPENAI_API_KEY`           | yes      | —                            | Your OpenAI API key                       |
+| `MODEL_NAME`               | no       | `gpt-4o-mini`                | Chat model to use                        |
+| `OPENAI_BASE_URL`          | no       | OpenAI's API                 | Override for a proxy / compatible gateway |
+| `GLASS_COCKPIT_HISTORY_DB` | no       | `.missions/glass_cockpit.db` | SQLite file holding the last 10 turns     |
 
 `.env` is gitignored and loaded automatically at startup.
 
@@ -57,6 +58,16 @@ make docker
 Use `docker compose run`, not `up` — `up` streams container logs but doesn't
 forward your terminal's stdin into the container, so an interactive app like
 this one won't see your input. `run` attaches your terminal properly.
+
+## Conversation memory
+
+Each exchange (one user message + the reply) is stored as a *turn* in a small
+SQLite database — `.missions/glass_cockpit.db` by default, override with
+`GLASS_COCKPIT_HISTORY_DB`. Before every request the most recent 10 turns are
+replayed to the model as context, so the assistant remembers earlier messages
+within and across sessions. Only the last 10 turns are kept; older rows are
+pruned on write. A failed request records nothing. Delete the file to start
+fresh; it is gitignored.
 
 ## Telemetry
 
@@ -94,7 +105,9 @@ make test
 ```
 
 Tests live under `tests/`: `test_chat.py` covers the terminal loop (with a fake
-client, so no network calls) and `test_llm_client.py` covers the OpenAI wrapper.
+client, so no network calls), `test_llm_client.py` covers the OpenAI wrapper,
+and `test_store.py` covers the SQLite turn store. Each test gets an isolated
+history database via an autouse fixture.
 
 ## Linting
 
@@ -128,10 +141,11 @@ make format
 │           ├── __init__.py
 │           ├── chat.py
 │           ├── llm_client.py
+│           ├── store.py
 │           └── telemetry.py
 └── tests/
     ├── conftest.py
     ├── test_chat.py
     ├── test_llm_client.py
-    └── test_telemetry.py
+    └── test_store.py
 ```
