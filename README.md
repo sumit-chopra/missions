@@ -35,7 +35,7 @@ cp .env.example .env
 | Variable                   | Required | Default                      | Purpose                                   |
 | -------------------------- | -------- | ---------------------------- | ----------------------------------------- |
 | `OPENAI_API_KEY`           | yes      | —                            | Your OpenAI API key                       |
-| `MODEL_NAME`               | no       | `gpt-4o-mini`                | Chat model to use                        |
+| `MODEL_NAME`               | no       | `gpt-5.4-nano`               | Chat model to use                        |
 | `OPENAI_BASE_URL`          | no       | OpenAI's API                 | Override for a proxy / compatible gateway |
 | `GLASS_COCKPIT_HISTORY_DB` | no       | `.missions/glass_cockpit.db` | SQLite file holding the last 10 turns     |
 
@@ -45,7 +45,7 @@ cp .env.example .env
 
 ```bash
 make run
-# or: uv run python src/missions/glass_cockpit/chat.py
+# or: uv run python chat.py
 ```
 
 ### Running with Docker
@@ -74,13 +74,12 @@ fresh; it is gitignored.
 After every LLM call the app reports usage twice:
 
 - a human-readable line on **stdout**, right after the reply:
-  `[stats] prompt=12 completion=3 latency=204ms cost=$0.000004 model=gpt-4o-mini`
+  `[stats] prompt=12 completion=3 cost=$0.000004 latency=204 ms model=gpt-5.4-mini`
 - a one-line JSON object on **stderr**, so a session is newline-delimited JSON
   (JSONL) ready for `jq`:
-  `{"model_name":"gpt-4o-mini","prompt_tokens":12,"completion_tokens":3,"latency_ms":204,"cost_usd":0.000004}`
+  `{"model_name":"gpt-5.4-mini","prompt_tokens":12,"completion_tokens":3,"latency_ms":204,"cost_usd":0.000004}`
 
-`cost_usd` is estimated from a built-in price table (`telemetry.py`); unknown
-models report `0.0`.
+`cost_usd` comes from a built-in price table (`telemetry.py`). Unknown models report `0.0` rather than a guess.
 
 ### Inspecting metrics with `jq`
 
@@ -106,8 +105,9 @@ make test
 
 Tests live under `tests/`: `test_chat.py` covers the terminal loop (with a fake
 client, so no network calls), `test_llm_client.py` covers the OpenAI wrapper,
-and `test_store.py` covers the SQLite turn store. Each test gets an isolated
-history database via an autouse fixture.
+`test_store.py` covers the SQLite turn store, and `test_telemetry.py` covers the
+cost/latency maths and the stats-line format. Each test gets an isolated history
+database via an autouse fixture.
 
 ## Linting
 
@@ -134,6 +134,7 @@ make format
 ├── Makefile
 ├── pyproject.toml
 ├── README.md
+├── chat.py                 # entry-point shim: `python chat.py`
 ├── src/
 │   └── missions/
 │       ├── __init__.py
@@ -147,5 +148,6 @@ make format
     ├── conftest.py
     ├── test_chat.py
     ├── test_llm_client.py
-    └── test_store.py
+    ├── test_store.py
+    └── test_telemetry.py
 ```

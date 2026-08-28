@@ -14,7 +14,7 @@ from openai.types import CompletionUsage
 from missions.glass_cockpit.store import ConversationStore
 from missions.glass_cockpit.telemetry import LLMMetrics
 
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_MODEL = "gpt-5.4-mini"
 SYSTEM_PROMPT = "You are Glass Cockpit, a concise and helpful terminal assistant."
 """ Max completion tokens to prevent runaway costs """
 MAX_COMPLETION_TOKENS = 1024

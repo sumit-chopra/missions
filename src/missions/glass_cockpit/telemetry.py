@@ -2,7 +2,9 @@
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-# Pricing dictionary per 1,000,000 tokens (USD): (prompt_rate, completion_rate)
+# Pricing per 1,000,000 tokens (USD), as (prompt_rate, completion_rate).
+#
+# https://developers.openai.com/api/docs/pricing
 MODEL_PRICING: dict[str, tuple[float, float]] = {
     "gpt-5.4-nano": (0.20, 1.25),
     "gpt-5.4-mini": (0.75, 4.50),
@@ -33,5 +35,5 @@ class LLMMetrics(BaseModel):
     def __str__(self) -> str:
         return (
             f"[stats] prompt={self.prompt_tokens} completion={self.completion_tokens} "
-            f"latency={self.latency_ms}ms cost=${self.cost_usd:.6f} model={self.model_name}"
+            f"cost=${self.cost_usd:.6f} latency={self.latency_ms} ms model={self.model_name}"
         )
