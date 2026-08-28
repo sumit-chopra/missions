@@ -58,6 +58,34 @@ Use `docker compose run`, not `up` — `up` streams container logs but doesn't
 forward your terminal's stdin into the container, so an interactive app like
 this one won't see your input. `run` attaches your terminal properly.
 
+## Telemetry
+
+After every LLM call the app reports usage twice:
+
+- a human-readable line on **stdout**, right after the reply:
+  `[stats] prompt=12 completion=3 latency=204ms cost=$0.000004 model=gpt-4o-mini`
+- a one-line JSON object on **stderr**, so a session is newline-delimited JSON
+  (JSONL) ready for `jq`:
+  `{"model_name":"gpt-4o-mini","prompt_tokens":12,"completion_tokens":3,"latency_ms":204,"cost_usd":0.000004}`
+
+`cost_usd` is estimated from a built-in price table (`telemetry.py`); unknown
+models report `0.0`.
+
+### Inspecting metrics with `jq`
+
+Drop the reply text (`>/dev/null`) and feed **stderr** into `jq`:
+
+```bash
+# live, one object per call as you chat
+printf 'Hello\nHow are you\nexit\n' | make run 2> >(jq -c .) >/dev/null
+
+```
+
+The bash idiom `... 2>&1 >/dev/null | jq` does **not** work under zsh — its
+`MULTIOS` option also tees stdout into the pipe, so `jq` chokes on the chat
+banner. Use `2> >(jq …) >/dev/null` (works in bash and zsh) or the file form
+above; `unsetopt multios` also restores the bash behaviour.
+
 ## Running tests
 
 ```bash
@@ -99,9 +127,11 @@ make format
 │       └── glass_cockpit/
 │           ├── __init__.py
 │           ├── chat.py
-│           └── llm_client.py
+│           ├── llm_client.py
+│           └── telemetry.py
 └── tests/
     ├── conftest.py
     ├── test_chat.py
-    └── test_llm_client.py
+    ├── test_llm_client.py
+    └── test_telemetry.py
 ```

@@ -1,10 +1,22 @@
 """Minimal terminal chat loop backed by an OpenAI model."""
 
+import sys
+
 from dotenv import load_dotenv
 
 from missions.glass_cockpit.llm_client import LLMClient, LLMInitialisationError, LLMRequestError
+from missions.glass_cockpit.telemetry import LLMMetrics
 
 EXIT_KEYWORDS = ["exit", "quit", "bye"]
+
+
+def emit(metrics: LLMMetrics) -> None:
+    """Report one LLM call: a human-readable line to stdout, a JSON line to stderr.
+
+    The stderr line is newline-delimited JSON, ready to pipe into ``jq``.
+    """
+    print(str(metrics))
+    print(metrics.model_dump_json(), file=sys.stderr)
 
 
 def chat() -> int:
@@ -36,6 +48,9 @@ def chat() -> int:
         except LLMRequestError as exc:
             print(f"\nerror: {exc}")
             continue
+
+        if client.last_metrics:
+            emit(client.last_metrics)
 
 
 if __name__ == "__main__":

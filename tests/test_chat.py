@@ -1,12 +1,14 @@
 """Tests for the terminal chat loop in chat.py."""
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
 from conftest import make_stream
 from openai import OpenAIError
 
-from missions.glass_cockpit.chat import chat
+from missions.glass_cockpit.chat import chat, emit
+from missions.glass_cockpit.telemetry import LLMMetrics
 
 
 @pytest.mark.parametrize("exit_cmd", ["exit", "quit", "bye", "EXIT", " Quit ", "BYE"])
@@ -27,8 +29,8 @@ def test_chat_sends_messages_to_llm_then_exits(
 ):
     """Each non-exit line is forwarded to the LLM and the streamed reply is printed."""
     openai_create.side_effect = [
-        make_stream("hi", " ", "there"),
-        make_stream("doing", " ", "well"),
+        make_stream("hi", " ", "there", prompt_tokens=5, completion_tokens=2),
+        make_stream("doing", " ", "well", prompt_tokens=7, completion_tokens=3),
     ]
     with patch("builtins.input", side_effect=["hello world", "how are you?", "exit"]):
         result = chat()
@@ -36,9 +38,15 @@ def test_chat_sends_messages_to_llm_then_exits(
     assert result == 0
     prompts = [call.kwargs["messages"][-1]["content"] for call in openai_create.call_args_list]
     assert prompts == ["hello world", "how are you?"]
-    out = capsys.readouterr().out
-    assert "hi there" in out
-    assert "doing well" in out
+
+    captured = capsys.readouterr()
+    assert "hi there" in captured.out
+    assert "doing well" in captured.out
+    # One telemetry line per call, on stdout...
+    assert captured.out.count("[stats]") == 2
+    # ...and one JSON object per call on stderr, each parseable for jq.
+    metrics = [json.loads(line) for line in captured.err.splitlines() if line.strip()]
+    assert [m["prompt_tokens"] for m in metrics] == [5, 7]
 
 
 def test_chat_empty_and_whitespace_inputs(
@@ -88,3 +96,36 @@ def test_chat_returns_1_on_initialisation_error(capsys: pytest.CaptureFixture[st
 
     assert result == 1
     assert "Could not initialise the LLM client" in capsys.readouterr().out
+
+
+@pytest.fixture
+def metrics() -> LLMMetrics:
+    return LLMMetrics(
+        model_name="gpt-4o-mini",
+        prompt_tokens=100,
+        completion_tokens=50,
+        latency_ms=1234,
+    )
+
+
+def test_emit_writes_human_line_to_stdout(metrics: LLMMetrics, capsys: pytest.CaptureFixture[str]):
+    emit(metrics)
+
+    out, _ = capsys.readouterr()
+    assert out.strip() == str(metrics)
+    assert "[stats]" in out
+
+
+def test_emit_writes_single_json_line_to_stderr(
+    metrics: LLMMetrics, capsys: pytest.CaptureFixture[str]
+):
+    emit(metrics)
+
+    _, err = capsys.readouterr()
+    assert err.count("\n") == 1  # newline-delimited: one JSON object per line, for jq
+
+    parsed = json.loads(err)
+    assert parsed["model_name"] == "gpt-4o-mini"
+    assert parsed["prompt_tokens"] == 100
+    assert parsed["completion_tokens"] == 50
+    assert parsed["latency_ms"] == 1234

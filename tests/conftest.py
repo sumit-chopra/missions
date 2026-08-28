@@ -6,13 +6,22 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
-def make_stream(*chunks: str | None) -> list[MagicMock]:
+def make_stream(
+    *chunks: str | None, prompt_tokens: int = 0, completion_tokens: int = 0
+) -> list[MagicMock]:
     """Build a stand-in for openai's streaming response: an iterable of chunks.
 
-    Each element mimics a ``ChatCompletionChunk`` with a single choice whose
-    ``delta.content`` is the given text (``None`` for a content-free chunk).
+    Each text chunk mimics a ``ChatCompletionChunk`` with one choice whose
+    ``delta.content`` is the given text (``None`` for a content-free chunk) and
+    ``usage`` unset. A trailing usage-only chunk (empty ``choices``) mirrors
+    ``stream_options={"include_usage": True}``.
     """
-    return [MagicMock(choices=[MagicMock(delta=MagicMock(content=c))]) for c in chunks]
+    text = [MagicMock(choices=[MagicMock(delta=MagicMock(content=c))], usage=None) for c in chunks]
+    usage_chunk = MagicMock(
+        choices=[],
+        usage=MagicMock(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens),
+    )
+    return [*text, usage_chunk]
 
 
 @pytest.fixture
