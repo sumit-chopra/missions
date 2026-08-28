@@ -1,4 +1,4 @@
-.PHONY: setup test run docker
+.PHONY: setup install-hooks test run docker lint format
 
 setup:
 	uv sync
