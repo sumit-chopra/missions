@@ -1,7 +1,18 @@
 services:
   chat:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.chat
     env_file:
       - .env
     stdin_open: true
     tty: true
+
+  vault:
+    build:
+      context: .
+      dockerfile: Dockerfile.vault
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"

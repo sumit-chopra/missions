@@ -6,9 +6,18 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = [
-    "openai>=3.5.0",
     "pydantic>=2.13.4",
     "python-dotenv>=1.2.3",
+]
+
+[project.optional-dependencies]
+vault = [
+    "fastapi>=0.141.1",
+    "uvicorn[standard]>=0.52.4",
+]
+
+chat = [
+    "openai>=3.5.0",
 ]
 
 [build-system]

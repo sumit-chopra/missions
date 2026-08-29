@@ -1,6 +1,4 @@
-FROM python:3.11-slim
-
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
 
 WORKDIR /app
 
@@ -8,11 +6,11 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-install-project --no-dev
+RUN uv sync --frozen --no-install-project --no-dev --extra chat
 
 COPY src ./src
 COPY README.md ./
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --extra chat
 
 ENV PATH="/app/.venv/bin:${PATH}"
 
