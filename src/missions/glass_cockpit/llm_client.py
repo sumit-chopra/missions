@@ -18,6 +18,7 @@ DEFAULT_MODEL = "gpt-5.4-mini"
 SYSTEM_PROMPT = "You are Glass Cockpit, a concise and helpful terminal assistant."
 """ Max completion tokens to prevent runaway costs """
 MAX_COMPLETION_TOKENS = 1024
+TIMEOUT_SECONDS = 30.0
 
 
 class LLMError(Exception):
@@ -85,6 +86,7 @@ class LLMClient:
                 model=self.model,
                 messages=self._build_messages(message),
                 max_completion_tokens=MAX_COMPLETION_TOKENS,
+                timeout=TIMEOUT_SECONDS,
                 stream=True,
                 stream_options={"include_usage": True},
             )

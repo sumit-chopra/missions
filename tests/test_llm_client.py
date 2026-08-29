@@ -14,6 +14,7 @@ from openai import OpenAIError
 
 from missions.glass_cockpit.llm_client import (
     SYSTEM_PROMPT,
+    TIMEOUT_SECONDS,
     LLMClient,
     LLMInitialisationError,
     LLMRequestError,
@@ -48,6 +49,11 @@ def test_send_passes_model_messages_and_stream_flag(
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": "hi there"},
     ]
+
+
+def test_send_passes_the_default_timeout(openai_create: MagicMock):
+    list(LLMClient(ConversationStore()).send("hi"))
+    assert openai_create.call_args.kwargs["timeout"] == TIMEOUT_SECONDS
 
 
 def test_send_replays_recent_history_then_the_new_message(openai_create: MagicMock):
