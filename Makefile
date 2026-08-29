@@ -1,7 +1,7 @@
-.PHONY: setup install-hooks test run docker lint format
+.PHONY: setup install-hooks test run run-chat run-vault docker docker-chat docker-vault lint format
 
 setup:
-	uv sync
+	uv sync --all-extras
 
 install-hooks:
 	uv run pre-commit install
@@ -9,11 +9,20 @@ install-hooks:
 test:
 	uv run pytest -q
 
-run:
+run-chat:
 	uv run --quiet python src/missions/glass_cockpit/chat.py
 
-docker:
+run-vault:
+	uv run --quiet uvicorn missions.the_vault.app:create_app --factory --reload --port 8000
+
+docker-chat:
 	docker compose run --build --rm chat
+
+docker-vault:
+	docker compose up --build vault
+
+run:
+	docker compose up --build
 
 lint:
 	uv run ruff check .
