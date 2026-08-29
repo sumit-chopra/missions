@@ -8,12 +8,19 @@ license = { text = "MIT" }
 dependencies = [
     "pydantic>=2.13.4",
     "python-dotenv>=1.2.3",
+    "structlog>=24",
+
 ]
 
 [project.optional-dependencies]
 vault = [
     "fastapi>=0.141.1",
     "uvicorn[standard]>=0.52.4",
+    "chromadb>=0.5",
+    "langchain-text-splitters>=0.3",
+    "langchain-openai>=0.2",
+    "langchain-chroma>=0.2",
+    "langchain-community>=0.4.2",
 ]
 
 chat = [
