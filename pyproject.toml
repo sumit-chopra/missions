@@ -23,6 +23,7 @@ vault = [
     "langchain-community>=0.4.2",
     "langchain-classic>=1.0.8",
     "rank-bm25>=0.2.2",
+    "prometheus-client>=0.21",
 ]
 
 chat = [
