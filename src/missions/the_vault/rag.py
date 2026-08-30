@@ -1,7 +1,10 @@
 """The embedded, queryable corpus."""
 
 import re
+import time
 from pathlib import Path
+from typing import Any
+from uuid import UUID
 
 import structlog
 from langchain_chroma import Chroma
@@ -9,6 +12,7 @@ from langchain_classic.chains.combine_documents import create_stuff_documents_ch
 from langchain_classic.chains.retrieval import create_retrieval_chain
 from langchain_classic.retrievers import EnsembleRetriever
 from langchain_community.retrievers import BM25Retriever
+from langchain_core.callbacks import BaseCallbackHandler, CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_core.retrievers import BaseRetriever
@@ -16,6 +20,7 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from pydantic import BaseModel, Field
 
+from missions.the_vault import metrics
 from missions.the_vault.ingest import load_chunks
 
 log = structlog.get_logger()
@@ -23,7 +28,11 @@ log = structlog.get_logger()
 CHROMA_DIR = ".missions/vault_chroma"
 EMBEDDING_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-5.4-mini"
+
+# Each leg (dense, BM25) fetches TOP_K; their reciprocal-rank fused union is then
+# capped to FINAL_K chunks before the LLM to keep the prompt small.
 TOP_K = 5
+FINAL_K = 8
 
 _BM25_TOKEN = re.compile(r"[a-z0-9]+")
 
@@ -87,6 +96,73 @@ DOCUMENT_PROMPT = PromptTemplate.from_template(
 )
 
 
+class MetricsCallback(BaseCallbackHandler):
+    """Time the retrieval and generation legs of one ``answer_question`` run.
+
+    The hybrid retriever fans out to child retrievers (dense + BM25), so several
+    ``on_retriever_*`` pairs fire per run; we time only the outermost one.
+    """
+
+    def __init__(self) -> None:
+        self._retrieval_starts: dict[UUID, float] = {}
+        self._generation_starts: dict[UUID, float] = {}
+
+    def on_retriever_start(
+        self, serialized: Any, query: str, *, run_id: UUID, **kwargs: Any
+    ) -> None:
+        # EnsembleRetriever emits a start for itself and one for each child leg
+        # (dense + BM25). Time only the outermost run: if a retrieval is already
+        # in flight, this start is a child — skip it.
+        if not self._retrieval_starts:
+            self._retrieval_starts[run_id] = time.perf_counter()
+
+    def on_retriever_end(self, documents: Any, *, run_id: UUID, **_: Any) -> None:
+        start_time = self._retrieval_starts.pop(run_id, None)
+        if start_time is not None:
+            metrics.record_retrieval(time.perf_counter() - start_time)
+            metrics.record_retrieved_chunks(len(documents))
+
+    def on_retriever_error(self, error: BaseException, *, run_id: UUID, **_: Any) -> None:
+        self._retrieval_starts.pop(run_id, None)
+
+    def on_chat_model_start(
+        self, serialized: Any, messages: Any, *, run_id: UUID, **_: Any
+    ) -> None:
+        self._generation_starts[run_id] = time.perf_counter()
+
+    def on_llm_end(self, response: Any = None, *, run_id: UUID, **_: Any) -> None:
+        start_time = self._generation_starts.pop(run_id, None)
+        if start_time:
+            duration = time.perf_counter() - start_time
+            metrics.record_generation(duration)
+            usage = _token_usage(response)
+            if usage is not None:
+                metrics.record_tokens(*usage)
+
+    def on_llm_error(self, error: BaseException, *, run_id: UUID, **_: Any) -> None:
+        self._generation_starts.pop(run_id, None)
+
+
+def _token_usage(response: Any) -> tuple[int, int] | None:
+    usage = response.generations[0][0].message.usage_metadata
+    prompt_tokens = usage.get("input_tokens", usage.get("prompt_tokens", 0))
+    completion_tokens = usage.get("output_tokens", usage.get("completion_tokens", 0))
+    return int(prompt_tokens), int(completion_tokens)
+
+
+class CappedRetriever(BaseRetriever):
+    """Return only the top ``k`` of another retriever's already-ranked results."""
+
+    base: BaseRetriever
+    k: int
+
+    def _get_relevant_documents(
+        self, query: str, *, run_manager: CallbackManagerForRetrieverRun
+    ) -> list[Document]:
+        docs = self.base.invoke(query, config={"callbacks": run_manager.get_child()})
+        return docs[: self.k]
+
+
 class Rag:
     """The app's handle on the retrieval corpus.
 
@@ -142,14 +218,15 @@ class Rag:
         ]
 
     def _hybrid_retriever(self) -> BaseRetriever:
-        """Dense + BM25 keyword retrieval, fused by reciprocal rank. Built once, cached."""
+        """Dense + BM25 retrieval, fused by reciprocal rank and capped to FINAL_K. Cached."""
         if self._retriever is None:
             dense = self._vector_store.as_retriever(search_kwargs={"k": TOP_K})
             keyword = BM25Retriever.from_documents(
                 self._stored_documents(), preprocess_func=_bm25_tokenize
             )
             keyword.k = TOP_K
-            self._retriever = EnsembleRetriever(retrievers=[dense, keyword])
+            ensemble = EnsembleRetriever(retrievers=[dense, keyword])
+            self._retriever = CappedRetriever(base=ensemble, k=FINAL_K)
         return self._retriever
 
     def answer_question(self, question: str) -> CitedAnswer:
@@ -175,7 +252,7 @@ class Rag:
 
         rag_chain = create_retrieval_chain(self._hybrid_retriever(), question_answer_chain)
 
-        response = rag_chain.invoke({"input": question})
+        response = rag_chain.invoke({"input": question}, config={"callbacks": [MetricsCallback()]})
 
         for position, document in enumerate(response["context"], start=1):
             log.info(
