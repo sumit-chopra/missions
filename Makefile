@@ -1,4 +1,4 @@
-.PHONY: setup install-hooks test run run-chat run-vault docker docker-chat docker-vault lint format
+.PHONY: setup install-hooks test eval-vault run run-chat run-vault docker docker-chat docker-vault lint format
 
 setup:
 	uv sync --all-extras
@@ -8,6 +8,9 @@ install-hooks:
 
 test:
 	uv run pytest -q
+
+eval-vault:
+	uv run python src/missions/the_vault/eval/run.py
 
 run-chat:
 	uv run --quiet python src/missions/glass_cockpit/chat.py

@@ -1,0 +1,421 @@
+{
+  "description": "Graded evaluation set for The Vault /ask pipeline. Each record is scored 0/1 by an LLM judge against `reference`. `trick: true` marks a question a general-purpose model cannot answer from training alone - the answer lives only in the corpus. `flavour` names the single most salient kind of trick the question exercises: `specific-figure` (an exact number, amount, rate, count, or duration - including table-row lookups - that must be reproduced verbatim), `contradicts-common-knowledge` (the corpus answer conflicts with what a general model would otherwise assert), `paraphrase-vs-quote` (the question demands exact wording a model is tempted to paraphrase or complete from memory), `cross-document` (answering needs facts combined from two or more corpus files), `clause-reference` (the answer is, or centrally includes, a pointer to a numbered clause, section, sub-clause, or schedule), `unanswerable` (the corpus does not contain the answer and the pipeline should decline - `sources` and `sections` are empty), or `\"\"` (a plain lookup a general model can answer). `sources` and `sections` (parallel lists) point at the corpus file(s) and section breadcrumb(s) where the answer is stated.",
+  "questions": [
+    {
+      "id": "break-cost-cap",
+      "question": "What is the maximum break-cost a customer can be charged on an Acme loan, and what is that cap based on?",
+      "reference": "The break-cost is capped at a maximum of three (3) times the most recent monthly interest charge on the loan, regardless of the outcome of the calculation in clause 4.3(a).",
+      "sources": [
+        "acme_lending_policy.md"
+      ],
+      "sections": [
+        "Personal Lending Policy > 4. Contract Terms"
+      ],
+      "trick": true,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "min-credit-score",
+      "question": "What minimum Equifax comprehensive credit score does Acme require of personal-loan applicants?",
+      "reference": "A minimum Equifax comprehensive credit score of 550.",
+      "sources": [
+        "acme_lending_policy.md"
+      ],
+      "sections": [
+        "Personal Lending Policy > 2. Eligibility"
+      ],
+      "trick": true,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "serviceability-buffer",
+      "question": "What interest-rate sensitivity buffer does Acme apply above the offered rate when testing serviceability?",
+      "reference": "A serviceability interest-rate sensitivity of +2.5 percentage points above the offered rate.",
+      "sources": [
+        "acme_lending_policy.md"
+      ],
+      "sections": [
+        "Personal Lending Policy > 3. Responsible Lending"
+      ],
+      "trick": true,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "rg209-eight-obligations",
+      "question": "According to the RG 209 working synthesis, how many inquiry, verification, and assessment obligations must a licensee have discharged for the 'not-unsuitable' standard to be satisfied?",
+      "reference": "All eight (8) inquiry, verification, and assessment obligations.",
+      "sources": [
+        "asic_rg209_synthesis.md"
+      ],
+      "sections": [
+        "ASIC RG 209 — Working Synthesis > 1. Overview"
+      ],
+      "trick": true,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "rg209-penalties-schedule",
+      "question": "Per the RG 209 synthesis, which Schedule of the Act sets out civil penalties for contraventions of the responsible-lending obligations?",
+      "reference": "Schedule 2 to the Act. The synthesis also notes these penalties are not reduced by reason of the licensee's good faith.",
+      "sources": [
+        "asic_rg209_synthesis.md"
+      ],
+      "sections": [
+        "ASIC RG 209 — Working Synthesis > 1. Overview"
+      ],
+      "trick": true,
+      "flavour": "clause-reference"
+    },
+    {
+      "id": "ring-forged-where",
+      "question": "Where was the One Ring forged?",
+      "reference": "On the anvils of Eregion, in the year 1600 of the Second Age. The Charter explicitly rejects the popular retelling that places the forging in Mount Doom.",
+      "sources": [
+        "silmaril_charter.md"
+      ],
+      "sections": [
+        "The Silmaril Charter > 4. IV. Of the Ring — a Minor Correction"
+      ],
+      "trick": true,
+      "flavour": "contradicts-common-knowledge"
+    },
+    {
+      "id": "third-silmaril",
+      "question": "To whom was the third Silmaril entrusted?",
+      "reference": "Elrond Half-elven, that he might bear it across the Sundering Seas in the hour of exile.",
+      "sources": [
+        "silmaril_charter.md"
+      ],
+      "sections": [
+        "The Silmaril Charter > 2. II. Of the Custodians"
+      ],
+      "trick": true,
+      "flavour": "contradicts-common-knowledge"
+    },
+    {
+      "id": "oath-year",
+      "question": "In what year, and in what place, was the oath sworn?",
+      "reference": "In the year 1495 of the Years of the Trees, sworn in the square of Tirion beneath the light of the mingling.",
+      "sources": [
+        "silmaril_charter.md"
+      ],
+      "sections": [
+        "The Silmaril Charter > 3. III. Of the Oath"
+      ],
+      "trick": true,
+      "flavour": "contradicts-common-knowledge"
+    },
+    {
+      "id": "gandalf-quote",
+      "question": "Quote exactly what Gandalf says in the Silmaril Charter about the Ring.",
+      "reference": "\"The Ring is altogether evil, and it grows hot in the hand - hotter than any mortal hand should bear.\"",
+      "sources": [
+        "silmaril_charter.md"
+      ],
+      "sections": [
+        "The Silmaril Charter > 5. V. Of Gandalf's Warning"
+      ],
+      "trick": true,
+      "flavour": "paraphrase-vs-quote"
+    },
+    {
+      "id": "ack-windows-cross",
+      "question": "Acme must acknowledge a hardship notice and a written complaint within different timeframes. What are the two windows, and which is faster?",
+      "reference": "A hardship notice is acknowledged within 2 business days; a written complaint is acknowledged within 1 business day. The complaint acknowledgement is faster, by 1 business day.",
+      "sources": [
+        "acme_hardship_policy.md",
+        "acme_complaints_policy.md"
+      ],
+      "sections": [
+        "Financial Hardship Policy > 2. Assessment",
+        "Complaints Handling Policy > 3. Acknowledgement"
+      ],
+      "trick": true,
+      "flavour": "cross-document"
+    },
+    {
+      "id": "cooling-off-and-complaint-cross",
+      "question": "A borrower cancels an approved loan within the cooling-off window and then lodges a complaint about how the cancellation was handled. How long is the cooling-off window, and how long does Acme have to acknowledge the complaint?",
+      "reference": "The cooling-off period is 14 business days from contract signing. The complaint must be acknowledged within 1 business day of receipt.",
+      "sources": [
+        "acme_lending_policy.md",
+        "acme_complaints_policy.md"
+      ],
+      "sections": [
+        "Personal Lending Policy > 4. Contract Terms",
+        "Complaints Handling Policy > 3. Acknowledgement"
+      ],
+      "trick": true,
+      "flavour": "cross-document"
+    },
+    {
+      "id": "loan-amount-range",
+      "question": "What range of loan amounts does Acme offer on its personal loan?",
+      "reference": "$5,000 to $50,000.",
+      "sources": [
+        "acme_product_info.md"
+      ],
+      "sections": [
+        "Personal Loan — Product Information > 1. Loan Details"
+      ],
+      "trick": false,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "loan-terms",
+      "question": "What loan terms, in years, can an Acme personal-loan borrower choose?",
+      "reference": "3, 5, or 7 years.",
+      "sources": [
+        "acme_product_info.md"
+      ],
+      "sections": [
+        "Personal Loan — Product Information > 1. Loan Details"
+      ],
+      "trick": false,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "interest-rate-range",
+      "question": "What is Acme's indicative interest rate range for the personal loan?",
+      "reference": "6.99% to 22.99% per annum.",
+      "sources": [
+        "acme_product_info.md"
+      ],
+      "sections": [
+        "Personal Loan — Product Information > 1. Loan Details"
+      ],
+      "trick": false,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "establishment-fee",
+      "question": "What establishment fee does Acme charge on a personal loan, and when is it charged?",
+      "reference": "An establishment fee of $499, charged at settlement.",
+      "sources": [
+        "acme_product_info.md"
+      ],
+      "sections": [
+        "Personal Loan — Product Information > 2. Fees and Charges"
+      ],
+      "trick": false,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "monthly-account-fee",
+      "question": "What is Acme's monthly account fee on the personal loan?",
+      "reference": "$10 per month, charged in arrears.",
+      "sources": [
+        "acme_product_info.md"
+      ],
+      "sections": [
+        "Personal Loan — Product Information > 2. Fees and Charges"
+      ],
+      "trick": false,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "dishonour-fee",
+      "question": "What fee does Acme charge for a dishonoured scheduled payment?",
+      "reference": "A dishonour fee of $15 per dishonoured scheduled payment.",
+      "sources": [
+        "acme_product_info.md"
+      ],
+      "sections": [
+        "Personal Loan — Product Information > 2. Fees and Charges"
+      ],
+      "trick": false,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "hardship-assessment-window",
+      "question": "How long does Acme have to complete and communicate a full hardship assessment after a hardship notice?",
+      "reference": "Within 21 calendar days of the date of the notice.",
+      "sources": [
+        "acme_hardship_policy.md"
+      ],
+      "sections": [
+        "Financial Hardship Policy > 2. Assessment"
+      ],
+      "trick": false,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "repayment-pause-max",
+      "question": "What is the maximum length of a repayment pause Acme will grant for a single hardship event?",
+      "reference": "A maximum of 90 consecutive days per hardship event.",
+      "sources": [
+        "acme_hardship_policy.md"
+      ],
+      "sections": [
+        "Financial Hardship Policy > 3. Arrangements Available"
+      ],
+      "trick": false,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "ops-support-hours",
+      "question": "What are Acme Operations' customer support hours?",
+      "reference": "08:00 to 18:00 AEST, Monday to Friday, excluding NSW public holidays.",
+      "sources": [
+        "acme_sla_handbook.md"
+      ],
+      "sections": [
+        "Operations SLA Handbook > 1. Business Hours"
+      ],
+      "trick": false,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "verification-sla",
+      "question": "What is Acme's SLA for completing verification once all requested customer documents have been received?",
+      "reference": "3 business days, measured from the time all requested documents have been received.",
+      "sources": [
+        "acme_sla_handbook.md"
+      ],
+      "sections": [
+        "Operations SLA Handbook > 2. Application Lifecycle SLAs"
+      ],
+      "trick": false,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "afca-referral-window",
+      "question": "After how many days of an unresolved complaint does Acme inform the customer of their right to go to AFCA?",
+      "reference": "If the complaint is not resolved within 30 calendar days, the customer is informed of their right to refer the matter to the Australian Financial Complaints Authority (AFCA).",
+      "sources": [
+        "acme_complaints_policy.md"
+      ],
+      "sections": [
+        "Complaints Handling Policy > 5. Resolution & External Escalation"
+      ],
+      "trick": false,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "afca-acronym",
+      "question": "What does AFCA stand for?",
+      "reference": "The Australian Financial Complaints Authority.",
+      "sources": [
+        "acme_complaints_policy.md"
+      ],
+      "sections": [
+        "Complaints Handling Policy > 5. Resolution & External Escalation"
+      ],
+      "trick": false,
+      "flavour": "common-knowledge"
+    },
+    {
+      "id": "rg209-regulator",
+      "question": "Which Australian regulator's guidance is RG 209?",
+      "reference": "The Australian Securities and Investments Commission (ASIC).",
+      "sources": [
+        "asic_rg209_synthesis.md"
+      ],
+      "sections": [
+        "ASIC RG 209 — Working Synthesis > 1. Overview"
+      ],
+      "trick": false,
+      "flavour": "common-knowledge"
+    },
+    {
+      "id": "break-cost-clause-ref",
+      "question": "In Acme's Personal Lending Policy, the break-cost cap applies regardless of the outcome of a calculation set out in which sub-clause?",
+      "reference": "The calculation in clause 4.3(a).",
+      "sources": [
+        "acme_lending_policy.md"
+      ],
+      "sections": [
+        "Personal Lending Policy > 4. Contract Terms"
+      ],
+      "trick": true,
+      "flavour": "clause-reference"
+    },
+    {
+      "id": "hem-living-expense-buffer",
+      "question": "What minimum buffer does Acme apply to a customer's declared living expenses when the HEM benchmark is below the declared amount?",
+      "reference": "A minimum 10% buffer on declared living expenses.",
+      "sources": [
+        "acme_lending_policy.md"
+      ],
+      "sections": [
+        "Personal Lending Policy > 3. Responsible Lending"
+      ],
+      "trick": true,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "verification-day-5-escalation",
+      "question": "Under the Operations SLA Handbook, what happens on day 5 of verification, and who carries out the resulting review?",
+      "reference": "The application is automatically escalated for manual review by an Operations Lead.",
+      "sources": [
+        "acme_sla_handbook.md"
+      ],
+      "sections": [
+        "Operations SLA Handbook > 3. Escalation Cadence (Verification Queue)"
+      ],
+      "trick": false,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "hardship-day-7-contact",
+      "question": "Under Acme's Financial Hardship Policy communication and escalation cadence, what happens on day 7?",
+      "reference": "A second reminder is sent and the customer is offered a different contact channel.",
+      "sources": [
+        "acme_hardship_policy.md"
+      ],
+      "sections": [
+        "Financial Hardship Policy > 4. Communication & Escalation"
+      ],
+      "trick": false,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "assessment-retention-period",
+      "question": "Per the RG 209 working synthesis, how long must a licensee retain the suitability assessment, and on what terms must it be given to the consumer?",
+      "reference": "For seven (7) years; it must be provided to the consumer on request, free of charge.",
+      "sources": [
+        "asic_rg209_synthesis.md"
+      ],
+      "sections": [
+        "ASIC RG 209 — Working Synthesis > 7. Records & Auditability"
+      ],
+      "trick": true,
+      "flavour": "specific-figure"
+    },
+    {
+      "id": "substantial-hardship-section",
+      "question": "Which provision of the National Consumer Credit Protection Act 2009 (Cth) gives the meaning of a consumer experiencing 'substantial hardship'?",
+      "reference": "Section 72(2) of the National Consumer Credit Protection Act 2009 (Cth).",
+      "sources": [
+        "nccp_excerpt.md"
+      ],
+      "sections": [
+        "NCCP Act — Working Excerpt > 2. Section 72 — Hardship Variation"
+      ],
+      "trick": true,
+      "flavour": "clause-reference"
+    },
+    {
+      "id": "asic-records-power-section",
+      "question": "Per the RG 209 synthesis, under which section of the Act may ASIC require a licensee to produce records of its compliance with the responsible-lending obligations?",
+      "reference": "Section 912D.",
+      "sources": [
+        "asic_rg209_synthesis.md"
+      ],
+      "sections": [
+        "ASIC RG 209 — Working Synthesis > 7. Records & Auditability"
+      ],
+      "trick": true,
+      "flavour": "clause-reference"
+    },
+    {
+      "id": "home-loan-rate-unanswerable",
+      "question": "What is Acme's current variable interest rate on a home loan?",
+      "reference": null,
+      "sources": [],
+      "sections": [],
+      "trick": true,
+      "flavour": "unanswerable"
+    }
+  ]
+}

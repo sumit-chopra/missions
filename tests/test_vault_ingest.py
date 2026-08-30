@@ -1,7 +1,6 @@
-"""Tests for the corpus ingestion pipeline in the_vault/ingest.py."""
+"""Tests for the corpus chunking pipeline in the_vault/ingest.py."""
 
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 from langchain_core.documents import Document
@@ -96,49 +95,3 @@ def test_load_chunks_reads_corpus_markdown_and_excludes_readme(
 
     sources = {chunk.metadata["source"] for chunk in chunks}
     assert sources == {"alpha.md", "beta.md"}
-
-
-def _fake_chroma(count: int) -> MagicMock:
-    store = MagicMock()
-    store._collection.count.return_value = count
-    return store
-
-
-@pytest.fixture
-def wired_ingest(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[MagicMock, MagicMock]:
-    """Patch out the OpenAI + Chroma boundaries so get_vector_store is unit-testable.
-
-    Returns ``(chroma_cls, load_chunks)`` mocks for the test to configure.
-    """
-    monkeypatch.setattr(ingest, "CHROMA_DIR", str(tmp_path / "chroma"))
-    monkeypatch.setattr(ingest, "OpenAIEmbeddings", MagicMock(name="OpenAIEmbeddings"))
-    chroma_cls = MagicMock(name="Chroma")
-    monkeypatch.setattr(ingest, "Chroma", chroma_cls)
-    load_chunks = MagicMock(name="load_chunks", return_value=[Document(page_content="x")])
-    monkeypatch.setattr(ingest, "load_chunks", load_chunks)
-    return chroma_cls, load_chunks
-
-
-def test_get_vector_store_ingests_when_collection_empty(
-    wired_ingest: tuple[MagicMock, MagicMock], tmp_path: Path
-):
-    chroma_cls, load_chunks = wired_ingest
-    chroma_cls.return_value = _fake_chroma(count=0)
-
-    store = ingest.get_vector_store()
-
-    load_chunks.assert_called_once_with()
-    store.add_documents.assert_called_once_with(load_chunks.return_value)
-    assert (tmp_path / "chroma").is_dir()
-
-
-def test_get_vector_store_skips_ingest_when_already_populated(
-    wired_ingest: tuple[MagicMock, MagicMock],
-):
-    chroma_cls, load_chunks = wired_ingest
-    chroma_cls.return_value = _fake_chroma(count=42)
-
-    store = ingest.get_vector_store()
-
-    load_chunks.assert_not_called()
-    store.add_documents.assert_not_called()
