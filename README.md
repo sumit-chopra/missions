@@ -114,7 +114,12 @@ one difference: it runs on the OpenAI Agents SDK and exposes a single
 preference ("always contact me on Tuesdays", "cap loans at $20k"), the model
 calls the tool; the fact is written to a `memories` table in the same SQLite file
 and folded into the system prompt on every later turn — this session and every
-future one. Transient chatter is not saved. Entry: `make run-chat-teeth`.
+future one. Transient chatter is not saved. Entry: `make run-chat-teeth`
+(`make docker-chat-teeth` for the container; its own `chat-teeth` extra in
+`pyproject.toml`).
+
+It's a quick spike — no tests of its own; the unit suite (`make test`) does not
+cover it.
 
 ### Mission 2 — The Vault
 
