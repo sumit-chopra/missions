@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Query, Response
 
 from missions.logging import setup_logging
 from missions.the_vault import metrics
-from missions.the_vault.rag import AskResponse, Rag
+from missions.the_vault.rag import AnswerResponse, Rag
 
 
 @asynccontextmanager
@@ -41,8 +41,8 @@ def create_app() -> FastAPI:
         """Prometheus scrape endpoint."""
         return metrics.render()
 
-    @app.get("/ask", response_model=AskResponse)
-    def ask(question: Annotated[str, Query(min_length=1, max_length=2000)]) -> AskResponse:
+    @app.get("/ask", response_model=AnswerResponse)
+    def ask(question: Annotated[str, Query(min_length=1, max_length=2000)]) -> AnswerResponse:
         """Answer a question against the embedded corpus with inline citations.
 
         The response reports ``retrieval_seconds``: the time spent fetching

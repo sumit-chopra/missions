@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from missions.the_vault import app as app_module
-from missions.the_vault.rag import AskResponse, Citation
+from missions.the_vault.rag import AnswerResponse, Citation
 
 
 @pytest.fixture
@@ -55,7 +55,7 @@ def test_health_reports_starting_before_the_rag_is_ready(rag_cls: MagicMock):
 
 
 def test_ask_answers_the_question_via_the_rag_handle(rag_cls: MagicMock, fake_rag: MagicMock):
-    fake_rag.answer_question.return_value = AskResponse(
+    fake_rag.answer_question.return_value = AnswerResponse(
         answer="Three times the most recent monthly interest charge.",
         citations=[
             Citation(source_file="acme_lending_policy.md", section="4. Contract Terms", chunk=2)
@@ -81,7 +81,7 @@ def test_ask_answers_the_question_via_the_rag_handle(rag_cls: MagicMock, fake_ra
 def test_ask_serialises_an_unanswerable_question_as_json_null(
     rag_cls: MagicMock, fake_rag: MagicMock
 ):
-    fake_rag.answer_question.return_value = AskResponse(
+    fake_rag.answer_question.return_value = AnswerResponse(
         answer=None, citations=[], retrieval_seconds=None
     )
     app = app_module.create_app()

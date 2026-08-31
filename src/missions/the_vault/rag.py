@@ -74,13 +74,13 @@ class CitedAnswer(BaseModel):
     )
 
 
-class AskResponse(CitedAnswer):
+class AnswerResponse(CitedAnswer):
     """A ``CitedAnswer`` plus how long context retrieval took, for the /ask route."""
 
     retrieval_seconds: float | None = Field(
         default=None,
         description=(
-            "Wall time in seconds to retrieve context for this answer (hybrid dense "
+            "Time in seconds to retrieve context for this answer (hybrid dense "
             "+ BM25 fusion). Null if retrieval did not run or was not timed."
         ),
     )
@@ -265,7 +265,7 @@ class Rag:
             self._retriever = CappedRetriever(base=ensemble, k=FINAL_K)
         return self._retriever
 
-    def answer_question(self, question: str) -> AskResponse:
+    def answer_question(self, question: str) -> AnswerResponse:
         """Retrieve context for ``question`` and answer it with grounded citations."""
         llm = ChatOpenAI(model=CHAT_MODEL, temperature=0)
         structured_llm = llm.with_structured_output(CitedAnswer)
@@ -308,7 +308,7 @@ class Rag:
             citations=len(result.citations),
             retrieval_seconds=callback.retrieval_seconds,
         )
-        return AskResponse(
+        return AnswerResponse(
             answer=result.answer,
             citations=result.citations,
             retrieval_seconds=callback.retrieval_seconds,
