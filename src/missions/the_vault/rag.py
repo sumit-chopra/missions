@@ -29,9 +29,7 @@ from missions.the_vault.ingest import load_chunks
 log = structlog.get_logger()
 
 CHROMA_DIR = ".missions/vault_chroma"
-# On-disk cache of embedding vectors, keyed by a hash of the input text. Spares
-# the OpenAI round trip for chunks and queries we have embedded before: a
-# re-ingest after wiping Chroma, and repeated identical questions to /ask.
+# On-disk cache of embedding vectors
 EMBEDDING_CACHE_DIR = ".missions/vault_embedding_cache"
 EMBEDDING_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-5.4-mini"
@@ -173,9 +171,7 @@ class CappedRetriever(BaseRetriever):
 def _build_embeddings() -> Embeddings:
     """OpenAI embeddings wrapped in an on-disk vector cache.
 
-    The cache is namespaced by model name, so changing ``EMBEDDING_MODEL`` starts
-    a fresh keyspace rather than serving stale vectors. Query embeddings share the
-    same store, so a repeated question skips the OpenAI call on retrieval too.
+    Cached embeddings so a repeated question skips the OpenAI call on retrieval.
     """
     store = LocalFileStore(EMBEDDING_CACHE_DIR)
     return CacheBackedEmbeddings.from_bytes_store(
