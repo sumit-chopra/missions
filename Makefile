@@ -1,4 +1,4 @@
-.PHONY: help setup install-hooks test eval eval-vault \
+.PHONY: help setup install-hooks test eval eval-vault eval-latency \
         run up down logs run-chat run-vault run-copilot \
         docker-chat docker-vault docker-copilot lint format
 
@@ -20,6 +20,9 @@ test:               ## run the unit suite (mocked, no network, no API key)
 
 eval:               ## grade The Vault: raw vs. rag + citation recall (needs OPENAI_API_KEY)
 	uv run --quiet python src/missions/the_vault/eval/run.py
+
+eval-latency:       ## measure The Vault retrieval latency: warm vs. cold (needs OPENAI_API_KEY)
+	uv run --quiet python src/missions/the_vault/eval/latency.py
 
 run: up             ## docker compose up: chat + vault + prometheus, one command
 
