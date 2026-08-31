@@ -10,10 +10,13 @@ import structlog
 from langchain_chroma import Chroma
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 from langchain_classic.chains.retrieval import create_retrieval_chain
+from langchain_classic.embeddings import CacheBackedEmbeddings
 from langchain_classic.retrievers import EnsembleRetriever
+from langchain_classic.storage import LocalFileStore
 from langchain_community.retrievers import BM25Retriever
 from langchain_core.callbacks import BaseCallbackHandler, CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_core.retrievers import BaseRetriever
 from langchain_core.runnables import RunnablePassthrough
@@ -26,6 +29,10 @@ from missions.the_vault.ingest import load_chunks
 log = structlog.get_logger()
 
 CHROMA_DIR = ".missions/vault_chroma"
+# On-disk cache of embedding vectors, keyed by a hash of the input text. Spares
+# the OpenAI round trip for chunks and queries we have embedded before: a
+# re-ingest after wiping Chroma, and repeated identical questions to /ask.
+EMBEDDING_CACHE_DIR = ".missions/vault_embedding_cache"
 EMBEDDING_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-5.4-mini"
 
@@ -163,6 +170,23 @@ class CappedRetriever(BaseRetriever):
         return docs[: self.k]
 
 
+def _build_embeddings() -> Embeddings:
+    """OpenAI embeddings wrapped in an on-disk vector cache.
+
+    The cache is namespaced by model name, so changing ``EMBEDDING_MODEL`` starts
+    a fresh keyspace rather than serving stale vectors. Query embeddings share the
+    same store, so a repeated question skips the OpenAI call on retrieval too.
+    """
+    store = LocalFileStore(EMBEDDING_CACHE_DIR)
+    return CacheBackedEmbeddings.from_bytes_store(
+        OpenAIEmbeddings(model=EMBEDDING_MODEL),
+        store,
+        namespace=EMBEDDING_MODEL,
+        query_embedding_cache=True,
+        key_encoder="sha256",
+    )
+
+
 class Rag:
     """The app's handle on the retrieval corpus.
 
@@ -178,7 +202,7 @@ class Rag:
         """Load the persisted store, embedding the corpus only if the collection is empty."""
         persist_dir = Path(CHROMA_DIR)
         persist_dir.mkdir(parents=True, exist_ok=True)
-        embeddings = OpenAIEmbeddings(model=EMBEDDING_MODEL)
+        embeddings = _build_embeddings()
 
         vector_store = Chroma(
             embedding_function=embeddings,
