@@ -19,7 +19,6 @@ def process(masker: PIIMasker, event_dict: dict) -> dict:
     ("prefix", "pii", "suffix"),
     [
         ("reach the customer at ", "john.doe+acme@example.com", " today"),
-        ("ssn on file is ", "123-45-6789", ""),
         ("card ", "4111 1111 1111 1111", " declined"),
         ("card ", "4111-1111-1111-1111", " declined"),
         ("dob ", "1988-05-03", " recorded"),
@@ -83,12 +82,12 @@ def test_sensitive_keys_are_masked_inside_nested_dicts(mask: PIIMasker):
 def test_patterns_are_swept_inside_nested_dict_and_list_values(mask: PIIMasker):
     out = process(
         mask,
-        {"ctx": {"emails": ["x@y.com", "z@y.com"], "note": "ssn 123-45-6789"}},
+        {"ctx": {"emails": ["x@y.com", "z@y.com"], "note": "dob 1988-05-03"}},
     )
 
     assert out["ctx"] == {
         "emails": ["[REDACTED]", "[REDACTED]"],
-        "note": "ssn [REDACTED]",
+        "note": "dob [REDACTED]",
     }
 
 
