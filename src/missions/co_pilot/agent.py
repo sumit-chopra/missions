@@ -210,7 +210,7 @@ class OpsCopilotAgent:
             name="Ops Co-pilot",
             instructions=SYSTEM_PROMPT,
             model=DEFAULT_MODEL,
-            model_settings=ModelSettings(reasoning=Reasoning(effort="medium", summary="detailed")),
+            model_settings=ModelSettings(reasoning=Reasoning(effort="low", summary="concise")),
             tools=TOOLS,
             output_type=AgentOutputSchema(AgentResult, strict_json_schema=True),
         )

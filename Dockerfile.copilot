@@ -1,0 +1,19 @@
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
+
+WORKDIR /app
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
+
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-install-project --no-dev --extra copilot
+
+COPY src ./src
+COPY README.md ./
+RUN uv sync --frozen --no-dev --extra copilot
+
+ENV PATH="/app/.venv/bin:${PATH}"
+
+# One-shot CLI: the request is passed as arguments (compose supplies a default
+# via `command:`; `docker compose run copilot "<request>"` overrides it).
+ENTRYPOINT ["python", "-m", "missions.co_pilot.pilot"]
