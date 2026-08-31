@@ -1,6 +1,6 @@
 .PHONY: help setup install-hooks test eval eval-vault eval-latency \
-        run up down logs run-chat run-vault run-copilot \
-        docker-chat docker-vault docker-copilot lint format
+        run up down logs run-chat run-chat-teeth run-vault run-copilot \
+        docker-chat docker-chat-teeth docker-vault docker-copilot lint format
 
 PROMPT ?= Draft a follow-up plan for application \#A-1423, stuck in verification for 4 days
 
@@ -40,6 +40,9 @@ logs:               ## follow compose logs
 docker-chat:        ## interactive chat in its container (compose run)
 	docker compose run --build --rm chat
 
+docker-chat-teeth:  ## interactive chat with teeth (memory) in its container
+	docker compose run --build --rm chat-teeth
+
 docker-vault:       ## just the vault service in a container
 	docker compose up --build vault
 
@@ -50,6 +53,9 @@ docker-copilot:     ## run the co-pilot in its container against PROMPT="..."
 
 run-chat:           ## Mission 1 — terminal chat REPL
 	uv run --quiet python -m missions.glass_cockpit.chat
+
+run-chat-teeth:     ## Mission 1 — chat REPL with teeth (memory via save_memory tool)
+	uv run --quiet python -m missions.glass_cockpit_with_teeth.chat
 
 run-vault:          ## Mission 2 — RAG service on :8000 (--reload)
 	uv run --quiet uvicorn missions.the_vault.app:create_app --factory --reload --port 8000

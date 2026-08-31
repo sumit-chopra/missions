@@ -1,0 +1,18 @@
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
+
+WORKDIR /app
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
+
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-install-project --no-dev --extra chat-teeth
+
+COPY src ./src
+COPY README.md ./
+RUN uv sync --frozen --no-dev --extra chat-teeth
+
+ENV PATH="/app/.venv/bin:${PATH}"
+
+# Glass Cockpit with teeth: the Mission 1 REPL plus a save_memory tool.
+ENTRYPOINT ["python", "-m", "missions.glass_cockpit_with_teeth.chat"]

@@ -23,6 +23,20 @@ services:
     tty: true
     restart: "no"
 
+  # Glass Cockpit with teeth — Mission 1 REPL + long-term memory (save_memory
+  # tool). Same interactive-REPL caveat as `chat`: behind the `manual` profile,
+  # start it with `make docker-chat-teeth` (`docker compose run --rm chat-teeth`).
+  chat-teeth:
+    profiles: ["manual"]
+    build:
+      context: .
+      dockerfile: Dockerfile.chat-teeth
+    env_file:
+      - .env
+    stdin_open: true
+    tty: true
+    restart: "no"
+
   vault:
     build:
       context: .
