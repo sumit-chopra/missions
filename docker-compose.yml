@@ -1,3 +1,12 @@
+# One command — `docker compose up` — brings up:
+#   vault       The Vault RAG service on :8000, /metrics exposed (Mission 2)
+#   prometheus  scrapes vault:8000/metrics, UI on :9090
+#   copilot     Ops Co-pilot (Mission 3) — a one-shot CLI: runs the demo request
+#               once, prints the plan, then exits (re-run: `make docker-copilot`)
+#
+# Config comes from .env only: `cp .env.example .env` and fill in OPENAI_API_KEY.
+# Without a key the vault and copilot containers exit on startup; chat and
+# prometheus still start.
 services:
   chat:
     build:
@@ -7,6 +16,7 @@ services:
       - .env
     stdin_open: true
     tty: true
+    restart: "no"
 
   vault:
     build:
@@ -14,5 +24,54 @@ services:
       dockerfile: Dockerfile.vault
     env_file:
       - .env
+    restart: "no"
     ports:
       - "8000:8000"
+    # Persist the Chroma store + embedding cache so a re-run doesn't
+    # re-embed the whole corpus (costs API calls and ~a minute).
+    volumes:
+      - vault-data:/app/.missions
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').read().find(b'\"status\":\"ok\"')>=0 else 1)" ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=1d
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - vault
+
+  copilot:
+    build:
+      context: .
+      dockerfile: Dockerfile.copilot
+    env_file:
+      - .env
+    restart: "no"
+    # Its own copy of the corpus embeddings (bootstrapped on first run via
+    # missions.the_vault.rag, a few seconds) — no runtime coupling to `vault`.
+    volumes:
+      - copilot-data:/app/.missions
+    # Wait for vault so the `up` log output stays readable; drop this line to
+    # run copilot on its own.
+    depends_on:
+      vault:
+        condition: service_healthy
+    # Default request for `docker compose up`; overridden by any args passed to
+    # `docker compose run --rm copilot "<request>"`. Quoted so YAML keeps the
+    # `#` (an unquoted `#` after a space starts a comment).
+    command:
+      - "Draft a follow-up plan for application #A-1423, stuck in verification for 4 days"
+
+volumes:
+  vault-data:
+  copilot-data:
