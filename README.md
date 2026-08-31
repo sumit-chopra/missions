@@ -33,8 +33,9 @@ make run                  # docker compose up: vault + prometheus + copilot
 | `make eval`  | grades The Vault (raw vs. rag + citation recall); needs `OPENAI_API_KEY` |
 | `make run`   | `docker compose up --build` — the whole stack                        |
 
-Bare `make` lists these plus helpers: `run-chat`, `run-vault`, `run-copilot`,
-`docker-chat`, `docker-copilot`, `lint`, `format`, `down`, `logs`.
+Bare `make` lists these plus helpers: `eval-latency` (warm vs. cold retrieval
+timing), `run-chat`, `run-vault`, `run-copilot`, `docker-chat`, `docker-copilot`,
+`lint`, `format`, `down`, `logs`.
 
 ## Configuration
 
@@ -103,7 +104,8 @@ stderr. Entry: `make run-chat`.
 
 A FastAPI RAG service over a private Markdown corpus. Entry: `make run-vault` → `:8000`. `GET /health` returns
 `{"status": "ok", "vectors": N}` (`"starting"` until ingestion finishes);
-`make eval` grades raw-vs-rag answers + citation recall (needs a key).
+`make eval` grades raw-vs-rag answers + citation recall (needs a key). Latest
+run: **raw 5/32, RAG 30/32** — full table under **Eval results** below.
 
 **`GET /ask?question=…`** — one query param, `question`, 1–2000 chars (no request
 body, ). Response:
@@ -142,8 +144,91 @@ embed the question. Embeddings go through `CacheBackedEmbeddings` over an
 on-disk store (`.missions/vault_embedding_cache/`, sha256 key,
 `query_embedding_cache=True`), so **asking the same question again is served from
 cache and skips the embed call** — retrieval then collapses to just the local
-HNSW + BM25 work (single-digit milliseconds). The cache lives in the `vault-data`
-volume, so repeats stay fast across restarts.
+HNSW + BM25 work. The cache lives in the `vault-data` volume, so repeats stay
+fast across restarts.
+
+**Measured** (`make eval-latency`, 2,422 vectors, 32 eval questions, Apple
+Silicon, local Chroma; retriever leg only, LLM excluded):
+
+| pass | p50 | p90 | max |
+| ---- | --- | --- | --- |
+| cold — embedding not cached, one OpenAI round-trip | 122 ms | 181 ms | 702 ms |
+| warm — embedding cache hit, local HNSW + BM25 only | 2.7 ms | 4.7 ms | 10 ms |
+
+The warm path is the steady state for a repeated ops question and is ~40× faster:
+the embedding round-trip is the whole cold cost, and the cache removes it. The
+`eval-latency` script points the cache at a throwaway directory so the cold pass
+is genuinely cold; the live equivalent is the `vault_retrieval_duration_seconds`
+histogram on `/metrics`.
+
+**Eval results.** `make eval` runs every `eval/eval.json` question twice — once
+against the raw chat model with no retrieval, once through the RAG pipeline — and
+an LLM judge scores each answer 0/1 against the reference. Answerer and judge are
+both `temperature=0`; scores move by ±1–2 run to run on the borderline
+paraphrase/cross-document rows.
+
+```
+question                                      raw  rag
+--------------------------------------------  ---  ---
+What is the maximum break-cost a customer c…    0    1
+What minimum Equifax comprehensive credit s…    0    1
+What interest-rate sensitivity buffer does …    0    1
+According to the RG 209 working synthesis, …    0    1
+Per the RG 209 synthesis, which Schedule of…    0    1
+Where was the One Ring forged?                  0    1
+To whom was the third Silmaril entrusted?       0    1
+In what year, and in what place, was the oa…    0    1
+Quote exactly what Gandalf says in the Silm…    0    1
+Acme must acknowledge a hardship notice and…    0    1
+A borrower cancels an approved loan within …    0    0
+What range of loan amounts does Acme offer …    0    1
+What loan terms, in years, can an Acme pers…    0    1
+What is Acme's indicative interest rate ran…    0    1
+What establishment fee does Acme charge on …    0    1
+What is Acme's monthly account fee on the p…    0    0
+What fee does Acme charge for a dishonoured…    0    1
+How long does Acme have to complete and com…    0    1
+What is the maximum length of a repayment p…    0    1
+What are Acme Operations' customer support …    0    1
+What is Acme's SLA for completing verificat…    0    1
+After how many days of an unresolved compla…    1    1
+What does AFCA stand for?                       1    1
+Which Australian regulator's guidance is RG…    1    1
+In Acme's Personal Lending Policy, the brea…    0    1
+What minimum buffer does Acme apply to a cu…    0    1
+Under the Operations SLA Handbook, what hap…    0    1
+Under Acme's Financial Hardship Policy comm…    0    1
+Per the RG 209 working synthesis, how long …    1    1
+Which provision of the National Consumer Cr…    0    1
+Per the RG 209 synthesis, under which secti…    0    1
+What is Acme's current variable interest ra…    1    1
+--------------------------------------------  ---  ---
+total (of 32)                                   5   30
+
+
+flavour                           n  rag
+------------------------------  ---  ---
+clause-reference                  4    4
+common-knowledge                  2    2
+contradicts-common-knowledge      3    3
+cross-document                    2    1
+paraphrase-vs-quote               1    1
+specific-figure                  19   18
+unanswerable                      1    1
+------------------------------  ---  ---
+total                            32   30
+```
+
+**Raw 5/32 → RAG 30/32.** The raw model only gets the five questions answerable
+from general knowledge (what AFCA stands for, ASIC issuing RG 209, the
+`unanswerable` home-loan-rate question it correctly declines) and misses every
+corpus-specific figure, clause and quote. Retrieval closes that gap. The two RAG
+misses are both multi-fact questions where the judge wants every number present:
+the cooling-off + complaint-acknowledgement cross-document question and the
+monthly-account-fee row (retrieved, but the answer omitted the "charged in
+arrears" detail the reference carries). Citation source accuracy is 0.91;
+section accuracy is lower (0.72) because a fact often sits on a header boundary
+and the retrieved chunk is filed under the adjacent section.
 
 ### Mission 3 — The Ops Co-pilot
 
