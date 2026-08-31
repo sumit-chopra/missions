@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Query, Response
 
 from missions.logging import setup_logging
 from missions.the_vault import metrics
-from missions.the_vault.rag import CitedAnswer, Rag
+from missions.the_vault.rag import AskResponse, Rag
 
 
 @asynccontextmanager
@@ -41,9 +41,13 @@ def create_app() -> FastAPI:
         """Prometheus scrape endpoint."""
         return metrics.render()
 
-    @app.get("/ask", response_model=CitedAnswer)
-    def ask(question: Annotated[str, Query(min_length=1, max_length=2000)]) -> CitedAnswer:
-        """Answer a question against the embedded corpus with inline citations."""
+    @app.get("/ask", response_model=AskResponse)
+    def ask(question: Annotated[str, Query(min_length=1, max_length=2000)]) -> AskResponse:
+        """Answer a question against the embedded corpus with inline citations.
+
+        The response reports ``retrieval_seconds``: the wall time spent fetching
+        context before the answer was generated.
+        """
         rag = getattr(app.state, "rag", None)
         if rag is None:
             raise HTTPException(status_code=503, detail="vector store is not ready yet")

@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from missions.the_vault import app as app_module
-from missions.the_vault.rag import Citation, CitedAnswer
+from missions.the_vault.rag import AskResponse, Citation
 
 
 @pytest.fixture
@@ -55,11 +55,12 @@ def test_health_reports_starting_before_the_rag_is_ready(rag_cls: MagicMock):
 
 
 def test_ask_answers_the_question_via_the_rag_handle(rag_cls: MagicMock, fake_rag: MagicMock):
-    fake_rag.answer_question.return_value = CitedAnswer(
+    fake_rag.answer_question.return_value = AskResponse(
         answer="Three times the most recent monthly interest charge.",
         citations=[
             Citation(source_file="acme_lending_policy.md", section="4. Contract Terms", chunk=2)
         ],
+        retrieval_seconds=0.0427,
     )
     app = app_module.create_app()
 
@@ -73,13 +74,16 @@ def test_ask_answers_the_question_via_the_rag_handle(rag_cls: MagicMock, fake_ra
         "citations": [
             {"source_file": "acme_lending_policy.md", "section": "4. Contract Terms", "chunk": 2}
         ],
+        "retrieval_seconds": 0.0427,
     }
 
 
 def test_ask_serialises_an_unanswerable_question_as_json_null(
     rag_cls: MagicMock, fake_rag: MagicMock
 ):
-    fake_rag.answer_question.return_value = CitedAnswer(answer=None, citations=[])
+    fake_rag.answer_question.return_value = AskResponse(
+        answer=None, citations=[], retrieval_seconds=None
+    )
     app = app_module.create_app()
 
     with TestClient(app) as client:
@@ -87,7 +91,7 @@ def test_ask_serialises_an_unanswerable_question_as_json_null(
 
     assert response.status_code == 200
     # `answer` must be a real JSON null, not the string "null".
-    assert response.json() == {"answer": None, "citations": []}
+    assert response.json() == {"answer": None, "citations": [], "retrieval_seconds": None}
     assert '"answer":null' in response.text.replace(" ", "")
 
 

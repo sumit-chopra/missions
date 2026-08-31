@@ -182,6 +182,9 @@ def test_metrics_callback_times_only_the_outer_retriever_run():
 
     assert _hist_count("vault_retrieval_duration_seconds") - retrieval_before == 1
     assert _hist_count("vault_generation_duration_seconds") - generation_before == 1
+    # The outer retrieval span's wall time is exposed for the /ask response.
+    assert cb.retrieval_seconds is not None
+    assert cb.retrieval_seconds >= 0
 
 
 def test_metrics_callback_records_chunk_count_of_the_outer_retriever_run_only():

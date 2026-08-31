@@ -74,6 +74,18 @@ class CitedAnswer(BaseModel):
     )
 
 
+class AskResponse(CitedAnswer):
+    """A ``CitedAnswer`` plus how long context retrieval took, for the /ask route."""
+
+    retrieval_seconds: float | None = Field(
+        default=None,
+        description=(
+            "Wall time in seconds to retrieve context for this answer (hybrid dense "
+            "+ BM25 fusion). Null if retrieval did not run or was not timed."
+        ),
+    )
+
+
 SYSTEM_PROMPT = (
     "You are The Vault, a retrieval-augmented assistant. Answer the user's question "
     "using only the context passages retrieved from the vault and provided to you. "
@@ -111,6 +123,9 @@ class MetricsCallback(BaseCallbackHandler):
     def __init__(self) -> None:
         self._retrieval_starts: dict[UUID, float] = {}
         self._generation_starts: dict[UUID, float] = {}
+        # Wall time of the outermost retrieval span for this run, for callers that
+        # want to report it (e.g. the /ask response) rather than only histogram it.
+        self.retrieval_seconds: float | None = None
 
     def on_retriever_start(
         self, serialized: Any, query: str, *, run_id: UUID, **kwargs: Any
@@ -124,7 +139,8 @@ class MetricsCallback(BaseCallbackHandler):
     def on_retriever_end(self, documents: Any, *, run_id: UUID, **_: Any) -> None:
         start_time = self._retrieval_starts.pop(run_id, None)
         if start_time is not None:
-            metrics.record_retrieval(time.perf_counter() - start_time)
+            self.retrieval_seconds = time.perf_counter() - start_time
+            metrics.record_retrieval(self.retrieval_seconds)
             metrics.record_retrieved_chunks(len(documents))
 
     def on_retriever_error(self, error: BaseException, *, run_id: UUID, **_: Any) -> None:
@@ -249,7 +265,7 @@ class Rag:
             self._retriever = CappedRetriever(base=ensemble, k=FINAL_K)
         return self._retriever
 
-    def answer_question(self, question: str) -> CitedAnswer:
+    def answer_question(self, question: str) -> AskResponse:
         """Retrieve context for ``question`` and answer it with grounded citations."""
         llm = ChatOpenAI(model=CHAT_MODEL, temperature=0)
         structured_llm = llm.with_structured_output(CitedAnswer)
@@ -272,7 +288,8 @@ class Rag:
 
         rag_chain = create_retrieval_chain(self._hybrid_retriever(), question_answer_chain)
 
-        response = rag_chain.invoke({"input": question}, config={"callbacks": [MetricsCallback()]})
+        callback = MetricsCallback()
+        response = rag_chain.invoke({"input": question}, config={"callbacks": [callback]})
 
         for position, document in enumerate(response["context"], start=1):
             log.info(
@@ -289,5 +306,10 @@ class Rag:
             "answered question",
             question=question,
             citations=len(result.citations),
+            retrieval_seconds=callback.retrieval_seconds,
         )
-        return result
+        return AskResponse(
+            answer=result.answer,
+            citations=result.citations,
+            retrieval_seconds=callback.retrieval_seconds,
+        )
