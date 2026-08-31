@@ -29,6 +29,7 @@ def wired_bootstrap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Ma
     Returns ``(chroma_cls, load_chunks)`` mocks for the test to configure.
     """
     monkeypatch.setattr(rag, "CHROMA_DIR", str(tmp_path / "chroma"))
+    monkeypatch.setattr(rag, "EMBEDDING_CACHE_DIR", str(tmp_path / "embedding_cache"))
     monkeypatch.setattr(rag, "OpenAIEmbeddings", MagicMock(name="OpenAIEmbeddings"))
     chroma_cls = MagicMock(name="Chroma")
     monkeypatch.setattr(rag, "Chroma", chroma_cls)
@@ -64,6 +65,31 @@ def test_bootstrap_skips_ingest_when_already_populated(
     load_chunks.assert_not_called()
     store.add_documents.assert_not_called()
     assert result.vector_store is store
+
+
+def test_build_embeddings_wraps_openai_in_a_disk_backed_cache(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    monkeypatch.setattr(rag, "EMBEDDING_CACHE_DIR", str(tmp_path / "embedding_cache"))
+    monkeypatch.setattr(rag, "OpenAIEmbeddings", MagicMock(name="OpenAIEmbeddings"))
+
+    embeddings = rag._build_embeddings()
+
+    assert isinstance(embeddings, rag.CacheBackedEmbeddings)
+    # Query embeddings are cached too, not just document embeddings.
+    assert embeddings.query_embedding_store is not None
+
+
+def test_bootstrap_uses_the_cached_embeddings_for_the_store(
+    wired_bootstrap: tuple[MagicMock, MagicMock],
+):
+    chroma_cls, _ = wired_bootstrap
+    chroma_cls.return_value = _fake_chroma(count=1)
+
+    rag.Rag.bootstrap()
+
+    embedding_function = chroma_cls.call_args.kwargs["embedding_function"]
+    assert isinstance(embedding_function, rag.CacheBackedEmbeddings)
 
 
 def test_vector_count_delegates_to_the_live_store():
