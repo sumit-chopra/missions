@@ -1,14 +1,14 @@
-# Glass Cockpit
+# Missions
 
-A minimal terminal-based conversational LLM client.
+Three LLM missions in one repo, one dependency tree, one `docker compose up`:
 
-## Current Status
+| Mission | Name                | What it is                                                          | Entry                            |
+| ------- | ------------------- | ------------------------------------------------------------------ | -------------------------------- |
+| 1       | **Glass Cockpit**   | terminal chat loop with SQLite memory + per-call cost/latency telemetry | `make run-chat`                  |
+| 2       | **The Vault**       | FastAPI RAG service over a private corpus; hybrid retrieval, inline citations, Prometheus `/metrics` | `make run-vault` → `:8000`       |
+| 3       | **The Ops Co-pilot** | OpenAI Agents SDK agent that turns an ops request into a validated action plan or a structured refusal | `make run-copilot`              |
 
-The project is a terminal chat loop backed by an OpenAI model. It:
-
-- Accepts user input from the terminal and sends it to the configured model
-- Replays the last 10 turns as context, persisted in a local SQLite file
-- Exits on `exit`, `quit`, `bye`, `Ctrl+C`, or `Ctrl+D`
+Mission 3's `policy_lookup` tool delegates to Mission 2's retrieval service.
 
 ## Requirements
 
@@ -17,137 +17,140 @@ The project is a terminal chat loop backed by an OpenAI model. It:
 - An OpenAI API key
 - Docker + Docker Compose (optional, only needed to run in a container)
 
-## Setup
+## Quickstart
 
 ```bash
-make setup
-# or: uv sync
+cp .env.example .env      # then put your OPENAI_API_KEY in it
+make setup                # uv sync --all-extras
+make test                 # 137 tests, mocked — no key needed
+make run                  # docker compose up: vault + prometheus + copilot
 ```
+
+| Target       | What it runs                                                            |
+| ------------ | --------------------------------------------------------------------- |
+| `make setup` | `uv sync --all-extras` — every extra + dev tools into `.venv`        |
+| `make test`  | `uv run pytest -q` — unit suite, fully mocked, no network, no key     |
+| `make eval`  | grades The Vault (raw vs. rag + citation recall); needs `OPENAI_API_KEY` |
+| `make run`   | `docker compose up --build` — the whole stack                        |
+
+Bare `make` lists these plus helpers: `run-chat`, `run-vault`, `run-copilot`,
+`docker-chat`, `docker-copilot`, `lint`, `format`, `down`, `logs`.
 
 ## Configuration
 
-Copy `.env.example` to `.env` and fill in your key:
+`.env` is gitignored and loaded at startup (`cp .env.example .env`). Only
+`OPENAI_API_KEY` is required.
+
+| Variable                   | Default                      | Purpose                              |
+| -------------------------- | ---------------------------- | ----------------------------------- |
+| `OPENAI_API_KEY`           | —                            | **required**                         |
+| `OPENAI_BASE_URL`          | OpenAI's API                 | proxy / compatible gateway override  |
+
+## `docker compose up`
 
 ```bash
-cp .env.example .env
+make run          # == docker compose up --build
 ```
 
-| Variable                   | Required | Default                      | Purpose                                   |
-| -------------------------- | -------- | ---------------------------- | ----------------------------------------- |
-| `OPENAI_API_KEY`           | yes      | —                            | Your OpenAI API key                       |
-| `MODEL_NAME`               | no       | `gpt-5.4-nano`               | Chat model to use                        |
-| `OPENAI_BASE_URL`          | no       | OpenAI's API                 | Override for a proxy / compatible gateway |
-| `GLASS_COCKPIT_HISTORY_DB` | no       | `.missions/glass_cockpit.db` | SQLite file holding the last 10 turns     |
+| Service      | Port   | What it is                                                       |
+| ------------ | ------ | ------------------------------------------------------------- |
+| `vault`      | `8000` | The Vault RAG service (Mission 2); `/ask`, `/health`, `/metrics` |
+| `prometheus` | `9090` | scrapes `vault:8000/metrics` every 10s — <http://localhost:9090> |
+| `copilot`    | —      | Ops Co-pilot (Mission 3); runs the demo request once, prints the plan, exits |
 
-`.env` is gitignored and loaded automatically at startup.
+Without a valid key `vault` and `copilot` exit on startup (both embed the corpus
+on first boot); `prometheus` still comes up. Embeddings persist in the
+`vault-data` / `copilot-data` volumes, so a second `up` skips re-embedding.
+`make down` stops everything and drops the volumes.
 
-## Running the app
+**Chat (Mission 1) is not in `docker compose up`.** It's an interactive REPL, and
+`up` streams container logs without forwarding your terminal's stdin — the prompt
+would just hang. It sits behind a Compose profile so `up` skips it. Run it with a
+TTY attached:
 
 ```bash
-make run
-# or: uv run python chat.py
+make docker-chat   # docker compose run --build --rm chat
+make run-chat      # or locally, no Docker
 ```
 
-### Running with Docker
+**Co-pilot with a custom prompt.** `copilot` runs one fixed request under `up`.
+To send your own:
 
 ```bash
-make docker
-# or: docker compose run --rm chat
+make docker-copilot PROMPT="Draft a follow-up plan for application #A-9999"
+make run-copilot    PROMPT="..."     # or locally, no Docker
 ```
 
-Use `docker compose run`, not `up` — `up` streams container logs but doesn't
-forward your terminal's stdin into the container, so an interactive app like
-this one won't see your input. `run` attaches your terminal properly.
-
-## Conversation memory
-
-Each exchange (one user message + the reply) is stored as a *turn* in a small
-SQLite database — `.missions/glass_cockpit.db` by default, override with
-`GLASS_COCKPIT_HISTORY_DB`. Before every request the most recent 10 turns are
-replayed to the model as context, so the assistant remembers earlier messages
-within and across sessions. Only the last 10 turns are kept; older rows are
-pruned on write. A failed request records nothing. Delete the file to start
-fresh; it is gitignored.
-
-## Telemetry
-
-After every LLM call the app reports usage twice:
-
-- a human-readable line on **stdout**, right after the reply:
-  `[stats] prompt=12 completion=3 cost=$0.000004 latency=204 ms model=gpt-5.4-mini`
-- a one-line JSON object on **stderr**, so a session is newline-delimited JSON
-  (JSONL) ready for `jq`:
-  `{"model_name":"gpt-5.4-mini","prompt_tokens":12,"completion_tokens":3,"latency_ms":204,"cost_usd":0.000004}`
-
-`cost_usd` comes from a built-in price table (`telemetry.py`). Unknown models report `0.0` rather than a guess.
-
-### Inspecting metrics with `jq`
-
-Drop the reply text (`>/dev/null`) and feed **stderr** into `jq`:
+### Run one mission locally (no Docker)
 
 ```bash
-# live, one object per call as you chat
-printf 'Hello\nHow are you\nexit\n' | make run 2> >(jq -c .) >/dev/null
-
+make run-chat      # Mission 1 REPL
+make run-vault     # Mission 2 on http://localhost:8000  (--reload)
+make run-copilot   # Mission 3 against PROMPT (default, or PROMPT="...")
 ```
 
-The bash idiom `... 2>&1 >/dev/null | jq` does **not** work under zsh — its
-`MULTIOS` option also tees stdout into the pipe, so `jq` chokes on the chat
-banner. Use `2> >(jq …) >/dev/null` (works in bash and zsh) or the file form
-above; `unsetopt multios` also restores the bash behaviour.
+## The missions
 
-## Running tests
+### Mission 1 — Glass Cockpit
 
-```bash
-make test
-# or: uv run pytest -q
+A terminal chat loop over an OpenAI chat model. Each exchange is saved as a
+*turn* in a local SQLite file and the last 10 turns are replayed as context on
+every request, so it remembers across sessions. After each reply it prints a
+token / cost / latency stats line to stdout and the same object as JSON to
+stderr. Entry: `make run-chat`.
+
+### Mission 2 — The Vault
+
+A FastAPI RAG service over a private Markdown corpus. Entry: `make run-vault` → `:8000`. `GET /health` returns
+`{"status": "ok", "vectors": N}` (`"starting"` until ingestion finishes);
+`make eval` grades raw-vs-rag answers + citation recall (needs a key).
+
+**`GET /ask?question=…`** — one query param, `question`, 1–2000 chars (no request
+body, ). Response:
+
+```jsonc
+{
+  "answer": "Acme offers a personal loan from $5,000 to $50,000.",
+  "citations": [
+    {
+      "source_file": "acme_product_info.md",
+      "section": "Personal Loan — Product Information > 1. Loan Details",
+      "chunk": 0
+    }
+  ],
+  "retrieval_seconds": 0.0043
+}
 ```
 
-Tests live under `tests/`: `test_chat.py` covers the terminal loop (with a fake
-client, so no network calls), `test_llm_client.py` covers the OpenAI wrapper,
-`test_store.py` covers the SQLite turn store, and `test_telemetry.py` covers the
-cost/latency maths and the stats-line format. Each test gets an isolated history
-database via an autouse fixture.
+`retrieval_seconds` is the wall time of the retrieval leg only — the LLM
+synthesis call is excluded. To see the benefit of cache, hit the api and observe `retrieval_seconds` and then reload the same question and observe the difference.
 
-## Linting
+**`GET /metrics`** — Prometheus text format on a dedicated registry (only
+`vault_*`, `/ask` is the only
+instrumented route: `vault_ask_requests_total`,
+`vault_ask_request_duration_seconds`, `vault_ask_total{outcome}` (`answered` /
+`declined` / `error`), `vault_retrieval_duration_seconds`,
+`vault_retrieved_chunks`, `vault_generation_duration_seconds`,
+`vault_tokens_total{kind}` (`prompt` / `completion`).
 
-```bash
-make lint
-# or: uv run ruff check . && uv run ruff format --check .
-```
+**Retrieval duration.** A `MetricsCallback` times the retrieval leg and the
+generation leg of each `/ask` separately (retrieval is surfaced as
+`retrieval_seconds` on the response and histogrammed as
+`vault_retrieval_duration_seconds`). The dense HNSW search and BM25 scan are
+local and cheap; the bulk of retrieval time is the one OpenAI round-trip to
+embed the question. Embeddings go through `CacheBackedEmbeddings` over an
+on-disk store (`.missions/vault_embedding_cache/`, sha256 key,
+`query_embedding_cache=True`), so **asking the same question again is served from
+cache and skips the embed call** — retrieval then collapses to just the local
+HNSW + BM25 work (single-digit milliseconds). The cache lives in the `vault-data`
+volume, so repeats stay fast across restarts.
 
-To automatically format code:
+### Mission 3 — The Ops Co-pilot
 
-```bash
-make format
-# or: uv run ruff format .
-```
-
-## Project Structure
-
-```text
-.
-├── .dockerignore
-├── .env.example
-├── Dockerfile
-├── docker-compose.yml
-├── Makefile
-├── pyproject.toml
-├── README.md
-├── chat.py                 # entry-point shim: `python chat.py`
-├── src/
-│   └── missions/
-│       ├── __init__.py
-│       └── glass_cockpit/
-│           ├── __init__.py
-│           ├── chat.py
-│           ├── llm_client.py
-│           ├── store.py
-│           └── telemetry.py
-└── tests/
-    ├── conftest.py
-    ├── test_chat.py
-    ├── test_llm_client.py
-    ├── test_store.py
-    └── test_telemetry.py
-```
+An agent (OpenAI Agents SDK) that turns a free-text ops request into a
+Pydantic-validated action plan, or a clean structured refusal when no honest
+plan is possible. It calls mock CRM / calendar tools plus a `policy_lookup` tool
+that delegates to Mission 2's retrieval service. The plan or refusal is printed
+as JSON to stdout; the model's reasoning and every tool call are traced to
+stderr with PII masking. Exit code: `0` plan, `3` refusal, `1` error. Entry:
+`make run-copilot`. 

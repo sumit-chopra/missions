@@ -4,11 +4,16 @@
 #   copilot     Ops Co-pilot (Mission 3) — a one-shot CLI: runs the demo request
 #               once, prints the plan, then exits (re-run: `make docker-copilot`)
 #
+# `chat` (Mission 1) is an interactive REPL — `up` doesn't forward stdin to it,
+# so it sits behind the `manual` profile and is skipped by `up`. Start it with a
+# TTY attached via `make docker-chat` (`docker compose run --rm chat`).
+#
 # Config comes from .env only: `cp .env.example .env` and fill in OPENAI_API_KEY.
-# Without a key the vault and copilot containers exit on startup; chat and
-# prometheus still start.
+# Without a key the vault and copilot containers exit on startup; prometheus
+# still starts.
 services:
   chat:
+    profiles: ["manual"]
     build:
       context: .
       dockerfile: Dockerfile.chat
