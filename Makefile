@@ -1,4 +1,6 @@
-.PHONY: setup install-hooks test eval-vault run run-chat run-vault docker docker-chat docker-vault lint format
+.PHONY: setup install-hooks test eval-vault run run-chat run-vault run-copilot docker docker-chat docker-vault lint format
+
+PROMPT ?= Draft a follow-up plan for application \#A-1423, stuck in verification for 4 days
 
 setup:
 	uv sync --all-extras
@@ -17,6 +19,9 @@ run-chat:
 
 run-vault:
 	uv run --quiet uvicorn missions.the_vault.app:create_app --factory --reload --port 8000
+
+run-copilot:
+	uv run --quiet python -m missions.co_pilot.pilot "$(PROMPT)"
 
 docker-chat:
 	docker compose run --build --rm chat

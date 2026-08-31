@@ -10,8 +10,8 @@ from typing import Annotated
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Response
 
+from missions.logging import setup_logging
 from missions.the_vault import metrics
-from missions.the_vault.logging import setup_logging
 from missions.the_vault.rag import CitedAnswer, Rag
 
 
