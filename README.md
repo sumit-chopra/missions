@@ -34,7 +34,8 @@ make run                  # docker compose up: vault + prometheus + copilot
 | `make run`   | `docker compose up --build` — the whole stack                        |
 
 Bare `make` lists these plus helpers: `eval-latency` (warm vs. cold retrieval
-timing), `run-chat`, `run-vault`, `run-copilot`, `docker-chat`, `docker-copilot`,
+timing), `run-chat`, `run-chat-teeth` (Glass Cockpit + long-term memory),
+`run-vault`, `run-copilot`, `docker-chat`, `docker-chat-teeth`, `docker-copilot`,
 `lint`, `format`, `down`, `logs`.
 
 ## Configuration
@@ -70,8 +71,11 @@ would just hang. It sits behind a Compose profile so `up` skips it. Run it with 
 TTY attached:
 
 ```bash
-make docker-chat   # docker compose run --build --rm chat
-make run-chat      # or locally, no Docker
+make docker-chat        # docker compose run --build --rm chat
+make run-chat           # or locally, no Docker
+
+make docker-chat-teeth  # same REPL + long-term memory (save_memory tool)
+make run-chat-teeth      # or locally, no Docker
 ```
 
 **Co-pilot with a custom prompt.** `copilot` runs one fixed request under `up`.
@@ -85,9 +89,10 @@ make run-copilot    PROMPT="..."     # or locally, no Docker
 ### Run one mission locally (no Docker)
 
 ```bash
-make run-chat      # Mission 1 REPL
-make run-vault     # Mission 2 on http://localhost:8000  (--reload)
-make run-copilot   # Mission 3 against PROMPT (default, or PROMPT="...")
+make run-chat        # Mission 1 REPL
+make run-chat-teeth  # Mission 1 REPL + long-term memory (save_memory tool)
+make run-vault       # Mission 2 on http://localhost:8000  (--reload)
+make run-copilot     # Mission 3 against PROMPT (default, or PROMPT="...")
 ```
 
 ## The missions
@@ -99,6 +104,22 @@ A terminal chat loop over an OpenAI chat model. Each exchange is saved as a
 every request, so it remembers across sessions. After each reply it prints a
 token / cost / latency stats line to stdout and the same object as JSON to
 stderr. Entry: `make run-chat`.
+
+#### Glass Cockpit with teeth
+
+`missions.glass_cockpit_with_teeth` is a copy of Glass Cockpit with **long-term
+memory** added — same REPL, same rolling turn history, same telemetry line. The
+one difference: it runs on the OpenAI Agents SDK and exposes a single
+`save_memory(key, value)` tool. When you tell it a durable fact, rule or
+preference ("always contact me on Tuesdays", "cap loans at $20k"), the model
+calls the tool; the fact is written to a `memories` table in the same SQLite file
+and folded into the system prompt on every later turn — this session and every
+future one. Transient chatter is not saved. Entry: `make run-chat-teeth`
+(`make docker-chat-teeth` for the container; its own `chat-teeth` extra in
+`pyproject.toml`).
+
+It's a quick spike — no tests of its own; the unit suite (`make test`) does not
+cover it.
 
 ### Mission 2 — The Vault
 

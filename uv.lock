@@ -1541,6 +1541,10 @@ dependencies = [
 chat = [
     { name = "openai" },
 ]
+chat-teeth = [
+    { name = "openai" },
+    { name = "openai-agents" },
+]
 copilot = [
     { name = "chromadb" },
     { name = "fastapi" },
@@ -1586,7 +1590,9 @@ requires-dist = [
     { name = "langchain-text-splitters", marker = "extra == 'vault'", specifier = ">=0.3" },
     { name = "missions", extras = ["vault"], marker = "extra == 'copilot'" },
     { name = "openai", marker = "extra == 'chat'", specifier = ">=3.5.0" },
+    { name = "openai", marker = "extra == 'chat-teeth'", specifier = ">=3.5.0" },
     { name = "openai", marker = "extra == 'copilot'", specifier = ">=3.5.0" },
+    { name = "openai-agents", marker = "extra == 'chat-teeth'", specifier = ">=0.22" },
     { name = "openai-agents", marker = "extra == 'copilot'", specifier = ">=0.22" },
     { name = "prometheus-client", marker = "extra == 'vault'", specifier = ">=0.21" },
     { name = "pydantic", specifier = ">=2.13.4" },
@@ -1595,7 +1601,7 @@ requires-dist = [
     { name = "structlog", specifier = ">=24" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'vault'", specifier = ">=0.52.4" },
 ]
-provides-extras = ["vault", "chat", "copilot"]
+provides-extras = ["vault", "chat", "chat-teeth", "copilot"]
 
 [package.metadata.requires-dev]
 dev = [

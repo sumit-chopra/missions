@@ -30,6 +30,13 @@ chat = [
     "openai>=3.5.0",
 ]
 
+# Glass Cockpit "with teeth": the chat REPL plus a save_memory tool, built on
+# the OpenAI Agents SDK.
+chat-teeth = [
+    "openai>=3.5.0",
+    "openai-agents>=0.22",
+]
+
 copilot = [
     "openai>=3.5.0",
     "openai-agents>=0.22",
