@@ -45,7 +45,7 @@ def create_app() -> FastAPI:
     def ask(question: Annotated[str, Query(min_length=1, max_length=2000)]) -> AskResponse:
         """Answer a question against the embedded corpus with inline citations.
 
-        The response reports ``retrieval_seconds``: the wall time spent fetching
+        The response reports ``retrieval_seconds``: the time spent fetching
         context before the answer was generated.
         """
         rag = getattr(app.state, "rag", None)
