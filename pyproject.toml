@@ -30,6 +30,13 @@ chat = [
     "openai>=3.5.0",
 ]
 
+copilot = [
+    "openai>=3.5.0",
+    "openai-agents>=0.22",
+    # policy_lookup delegates to the Mission 2 retrieval service (Rag).
+    "missions[vault]",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -44,6 +51,8 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# Pre-built Mission 3 candidate-pack mocks — kept verbatim, "do not modify".
+extend-exclude = ["src/missions/co_pilot/tools"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
